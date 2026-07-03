@@ -608,7 +608,7 @@ export default function Dashboard() {
               title={user?.email}>
               {user?.full_name?.[0]?.toUpperCase()||"U"}
             </div>
-            <button onClick={()=>{logout();navigate("/login");}}
+            <button onClick={()=>{logout();navigate("/");}}
               style={{background:"transparent",border:"1px solid var(--border)",
                 borderRadius:8,padding:"6px 12px",color:"var(--text-dim)",fontSize:12}}
               onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.borderColor="#EF4444";(e.currentTarget as HTMLButtonElement).style.color="#EF4444";}}
