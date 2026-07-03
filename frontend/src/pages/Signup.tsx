@@ -1,133 +1,122 @@
 // frontend/src/pages/Signup.tsx
-
 import { useState, CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const inputStyle: CSSProperties = {
-  width: "100%", padding: "11px 14px", borderRadius: 10,
-  background: "#06060F", border: "1px solid #1E1E3A", color: "#F1F5F9",
-  fontSize: 14, outline: "none", transition: "border-color 0.2s ease"
-};
-
 export default function Signup() {
   const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
   const { signup } = useAuth();
-  const navigate = useNavigate();
+  const navigate   = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const inputS: CSSProperties = {
+    width: "100%", padding: "11px 14px", borderRadius: 10,
+    background: "var(--bg)", border: "1px solid var(--border)",
+    color: "var(--text)", fontSize: 14, outline: "none",
+    transition: "border-color .2s", fontFamily: "inherit",
+  };
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await signup(email, password, fullName);
-      navigate("/");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Signup failed. Please try again.");
-    } finally {
-      setLoading(false);
-    }
+    if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    setError(""); setLoading(true);
+    try { await signup(email, password, fullName); navigate("/dashboard"); }
+    catch (err: any) { setError(err.response?.data?.detail || "Signup failed. Try again."); }
+    finally { setLoading(false); }
   };
 
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-      background: "#06060F", position: "relative", overflow: "hidden", fontFamily: "'Inter', sans-serif"
-    }}>
-      <div style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, #06B6D425, transparent 70%)", top: "-15%", right: "-10%" }} />
-      <div style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, #6366F120, transparent 70%)", bottom: "-15%", left: "-10%" }} />
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center",
+      justifyContent: "center", background: "var(--bg)", position: "relative",
+      overflow: "hidden", fontFamily: "'Inter',sans-serif" }}>
 
-      <div style={{ width: 380, position: "relative", zIndex: 1, padding: "0 16px" }}>
+      <div style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%",
+        background: "radial-gradient(circle,#06B6D425,transparent 70%)",
+        top: "-15%", right: "-10%", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", width: 500, height: 500, borderRadius: "50%",
+        background: "radial-gradient(circle,#6366F120,transparent 70%)",
+        bottom: "-15%", left: "-10%", pointerEvents: "none" }} />
+
+      <div style={{ width: "100%", maxWidth: 400, position: "relative", zIndex: 1, padding: "0 20px" }}>
+
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{
-            width: 50, height: 50, borderRadius: 14,
-            background: "linear-gradient(135deg, #6366F1, #06B6D4)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 24, margin: "0 auto 16px", boxShadow: "0 0 30px #6366F140"
-          }}>✦</div>
-          <h1 style={{ color: "#F1F5F9", fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Create your account</h1>
-          <p style={{ color: "#64748B", fontSize: 13 }}>Start asking questions from your documents</p>
+          <Link to="/" style={{ textDecoration: "none" }}>
+            <div style={{ width: 52, height: 52, borderRadius: 14,
+              background: "linear-gradient(135deg,#6366F1,#06B6D4)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 24, margin: "0 auto 16px", boxShadow: "0 0 30px #6366F140" }}>✦</div>
+          </Link>
+          <h1 style={{ color: "var(--text)", fontSize: 22, fontWeight: 800,
+            marginBottom: 6, letterSpacing: "-0.5px" }}>Create your account</h1>
+          <p style={{ color: "var(--text-dim)", fontSize: 13 }}>
+            Start asking questions from your documents
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} style={{ background: "#0D0D22", border: "1px solid #1E1E3A", borderRadius: 16, padding: 28 }}>
+        <form onSubmit={submit} style={{ background: "var(--surface)",
+          border: "1px solid var(--border)", borderRadius: 16, padding: 28 }}>
+
           {error && (
-            <div style={{
-              background: "#EF444415", border: "1px solid #EF444430", borderRadius: 8,
-              padding: "10px 14px", marginBottom: 16, color: "#EF4444", fontSize: 13
-            }}>
-              {error}
-            </div>
+            <div style={{ background: "#EF444415", border: "1px solid #EF444430",
+              borderRadius: 8, padding: "10px 14px", marginBottom: 18,
+              color: "#EF4444", fontSize: 13 }}>{error}</div>
           )}
 
-          <label style={{ display: "block", color: "#94A3B8", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>
-            Full Name
-          </label>
-          <input
-            type="text" required value={fullName} placeholder="your name"
-            onChange={e => setFullName(e.target.value)}
-            style={inputStyle}
+          <label style={{ display: "block", color: "var(--text-muted)", fontSize: 12,
+            fontWeight: 600, marginBottom: 6 }}>Full name</label>
+          <input type="text" required value={fullName} placeholder="Pushkar Pant"
+            onChange={e => setFullName(e.target.value)} style={inputS}
             onFocus={e => (e.target.style.borderColor = "#6366F1")}
-            onBlur={e => (e.target.style.borderColor = "#1E1E3A")}
-          />
+            onBlur={e  => (e.target.style.borderColor = "var(--border)")} />
 
-          <label style={{ display: "block", color: "#94A3B8", fontSize: 12, fontWeight: 600, marginTop: 16, marginBottom: 6 }}>
-            Email
-          </label>
-          <input
-            type="email" required value={email} placeholder="you@example.com"
-            onChange={e => setEmail(e.target.value)}
-            style={inputStyle}
+          <label style={{ display: "block", color: "var(--text-muted)", fontSize: 12,
+            fontWeight: 600, marginTop: 16, marginBottom: 6 }}>Email address</label>
+          <input type="email" required value={email} placeholder="you@example.com"
+            onChange={e => setEmail(e.target.value)} style={inputS}
             onFocus={e => (e.target.style.borderColor = "#6366F1")}
-            onBlur={e => (e.target.style.borderColor = "#1E1E3A")}
-          />
+            onBlur={e  => (e.target.style.borderColor = "var(--border)")} />
 
-          <label style={{ display: "block", color: "#94A3B8", fontSize: 12, fontWeight: 600, marginTop: 16, marginBottom: 6 }}>
-            Password
-          </label>
-          <input
-            type="password" required value={password} placeholder="At least 6 characters"
-            onChange={e => setPassword(e.target.value)}
-            style={inputStyle}
+          <label style={{ display: "block", color: "var(--text-muted)", fontSize: 12,
+            fontWeight: 600, marginTop: 16, marginBottom: 6 }}>Password</label>
+          <input type="password" required value={password} placeholder="At least 6 characters"
+            onChange={e => setPassword(e.target.value)} style={inputS}
             onFocus={e => (e.target.style.borderColor = "#6366F1")}
-            onBlur={e => (e.target.style.borderColor = "#1E1E3A")}
-          />
+            onBlur={e  => (e.target.style.borderColor = "var(--border)")} />
 
-          <button
-            type="submit" disabled={loading}
-            style={{
-              width: "100%", marginTop: 24, padding: "12px 0", borderRadius: 10,
-              background: "linear-gradient(135deg, #6366F1, #4F46E5)", color: "white",
-              fontWeight: 600, fontSize: 14, border: "none",
-              cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1,
-              boxShadow: "0 4px 16px #6366F140"
-            }}
-          >
-            {loading ? "Creating account..." : "Create Account"}
+          {/* Password strength mini bar */}
+          <div style={{ marginTop: 8, display: "flex", gap: 4 }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ flex: 1, height: 3, borderRadius: 2,
+                background: password.length >= i * 3 ? (i === 3 ? "#10B981" : i === 2 ? "#F59E0B" : "#EF4444") : "var(--border)",
+                transition: "background .3s" }} />
+            ))}
+          </div>
+
+          <button type="submit" disabled={loading} style={{
+            width: "100%", marginTop: 22, padding: "12px 0", borderRadius: 10,
+            background: "linear-gradient(135deg,#6366F1,#4F46E5)",
+            color: "white", fontWeight: 700, fontSize: 14,
+            cursor: loading ? "not-allowed" : "pointer",
+            opacity: loading ? 0.7 : 1, boxShadow: "0 4px 16px #6366F140" }}>
+            {loading ? "Creating account…" : "Create Account →"}
           </button>
 
-          <div style={{
-            marginTop: 16, padding: "8px 12px", background: "#6366F110",
-            borderRadius: 8, color: "#94A3B8", fontSize: 11, textAlign: "center"
-          }}>
-            💡 The first person to sign up becomes the admin automatically
+          <div style={{ marginTop: 16, padding: "9px 12px", background: "#6366F110",
+            border: "1px solid #6366F120", borderRadius: 8, color: "var(--text-dim)",
+            fontSize: 11, textAlign: "center", lineHeight: 1.5 }}>
+            💡 The <strong style={{ color: "var(--text-muted)" }}>first</strong> person to sign up automatically becomes admin
           </div>
         </form>
 
-        <p style={{ textAlign: "center", color: "#64748B", fontSize: 13, marginTop: 20 }}>
+        <p style={{ textAlign: "center", color: "var(--text-dim)", fontSize: 13, marginTop: 20 }}>
           Already have an account?{" "}
-          <Link to="/login" style={{ color: "#6366F1", fontWeight: 600, textDecoration: "none" }}>
-            Sign in
-          </Link>
+          <Link to="/login" style={{ color: "#6366F1", fontWeight: 600, textDecoration: "none" }}>Sign in</Link>
+        </p>
+        <p style={{ textAlign: "center", marginTop: 8 }}>
+          <Link to="/" style={{ color: "var(--text-dim)", fontSize: 12, textDecoration: "none" }}>← Back to home</Link>
         </p>
       </div>
     </div>

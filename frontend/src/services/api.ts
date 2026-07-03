@@ -1,113 +1,81 @@
-// frontend/src/services/api.ts
-
 import axios from "axios";
-import {
-  Source, Document, Stats, User,
-  AdminStats, AdminUserRow, AdminQueryRow, AdminDocumentRow, ActivityPoint
-} from "../types";
+import { Source, Document, Stats, User, AdminStats, AdminUserRow, AdminQueryRow, AdminDocumentRow, ActivityPoint, Conversation, ConvoMessage } from "../types";
 
 const BASE = "http://localhost:8000";
+const api  = axios.create({ baseURL: BASE });
 
-const api = axios.create({ baseURL: BASE });
-
-// Attach the JWT to every outgoing request automatically.
-// This is the ONLY place auth headers are set — every service
-// function below benefits without repeating itself.
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("rag_token");
-  if (token) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+api.interceptors.request.use(cfg => {
+  const t = localStorage.getItem("rag_token");
+  if (t) cfg.headers = { ...cfg.headers, Authorization: `Bearer ${t}` };
+  return cfg;
+});
+api.interceptors.response.use(r => r, e => {
+  if (e.response?.status === 401) localStorage.removeItem("rag_token");
+  return Promise.reject(e);
 });
 
-// If the backend ever returns 401 (expired/invalid token),
-// clear local auth state so the UI doesn't get stuck "logged in"
-// while every request silently fails.
-api.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    if (err.response?.status === 401) {
-      localStorage.removeItem("rag_token");
-    }
-    return Promise.reject(err);
-  }
-);
+export const loginUser  = async (email:string, password:string) =>
+  (await api.post("/auth/login",  { email, password })).data as { access_token:string; user:User };
+export const signupUser = async (email:string, password:string, full_name:string) =>
+  (await api.post("/auth/signup", { email, password, full_name })).data as { access_token:string; user:User };
+export const getMe      = async () => (await api.get("/auth/me")).data as User;
 
-// ── Auth ─────────────────────────────────────────────────────────────────────
+export const askQuestion = async (question:string, top_k=7) =>
+  (await api.post("/ask", { question, top_k })).data as
+  { answer:string; sources:Source[]; confidence:number; suggestions:string[]; chunks_used:number };
 
-export const loginUser = async (email: string, password: string) => {
-  const res = await api.post("/auth/login", { email, password });
-  return res.data as { access_token: string; token_type: string; user: User };
-};
-
-export const signupUser = async (email: string, password: string, full_name: string) => {
-  const res = await api.post("/auth/signup", { email, password, full_name });
-  return res.data as { access_token: string; token_type: string; user: User };
-};
-
-export const getMe = async (): Promise<User> => {
-  const res = await api.get("/auth/me");
-  return res.data;
-};
-
-// ── RAG: ask / upload / documents ───────────────────────────────────────────
-
-export const askQuestion = async (question: string, top_k = 5) => {
-  const res = await api.post("/ask", { question, top_k });
-  return res.data as {
-    answer: string;
-    sources: Source[];
-    confidence: number;
-    suggestions: string[];
-    question: string;
-    chunks_used: number;
-  };
-};
-
-export const uploadDocument = async (file: File, onProgress?: (pct: number) => void) => {
+export const uploadDocumentSSE = (
+  file: File, token: string,
+  onProgress: (stage:string, pct:number) => void,
+  onDone:     (filename:string, chunks:number) => void,
+  onError:    (msg:string) => void
+) => {
   const form = new FormData();
   form.append("file", file);
-
-  const res = await api.post("/documents/upload", form, {
-    onUploadProgress: (e) => {
-      if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100));
-    },
-  });
-  return res.data;
+  fetch(`${BASE}/documents/upload`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+  }).then(res => {
+    if (!res.ok || !res.body) { onError("Upload failed"); return; }
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = "";
+    const pump = (): void => {
+      reader.read().then(({ done, value }) => {
+        if (done) return;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const d = JSON.parse(line.slice(6));
+            if (d.error) { onError(d.error); return; }
+            onProgress(d.stage, d.pct);
+            if (d.done) { onDone(d.filename ?? file.name, d.chunks ?? 0); return; }
+          } catch { /* malformed SSE line */ }
+        }
+        pump();
+      }).catch(() => onError("Connection lost"));
+    };
+    pump();
+  }).catch(() => onError("Network error"));
 };
 
-export const getDocuments = async (): Promise<{
-  documents: Document[]; total_chunks: number; total_documents: number;
-}> => {
-  const res = await api.get("/documents");
-  return res.data;
-};
+export const getDocuments   = async () => (await api.get("/documents")).data  as { documents:Document[]; total_chunks:number; total_documents:number };
+export const deleteDocument = async (f:string) => (await api.delete(`/documents/${encodeURIComponent(f)}`)).data;
+export const getStats       = async () => (await api.get("/stats")).data       as Stats;
 
-export const deleteDocument = async (filename: string) => {
-  const res = await api.delete(`/documents/${encodeURIComponent(filename)}`);
-  return res.data;
-};
+export const listConversations  = async () => (await api.get("/conversations")).data             as Conversation[];
+export const createConversation = async () => (await api.post("/conversations")).data            as Conversation;
+export const getMessages        = async (id:number) => (await api.get(`/conversations/${id}/messages`)).data as ConvoMessage[];
+export const addMessage         = async (id:number, role:string, content:string, sources:any[]=[],confidence=0) =>
+  (await api.post(`/conversations/${id}/messages`, { role, content, sources, confidence })).data;
+export const deleteConversation = async (id:number) => (await api.delete(`/conversations/${id}`)).data;
 
-export const getStats = async (): Promise<Stats> => {
-  const res = await api.get("/stats");
-  return res.data;
-};
-
-// ── Admin ─────────────────────────────────────────────────────────────────────
-
-export const getAdminStats = async (): Promise<AdminStats> =>
-  (await api.get("/admin/stats")).data;
-
-export const getAdminUsers = async (): Promise<AdminUserRow[]> =>
-  (await api.get("/admin/users")).data;
-
-export const getAdminQueries = async (limit = 50): Promise<AdminQueryRow[]> =>
-  (await api.get(`/admin/queries?limit=${limit}`)).data;
-
-export const getAdminDocuments = async (): Promise<AdminDocumentRow[]> =>
-  (await api.get("/admin/documents")).data;
-
-export const getAdminActivity = async (): Promise<ActivityPoint[]> =>
-  (await api.get("/admin/activity-timeline")).data;
+export const getAdminStats     = async () => (await api.get("/admin/stats")).data     as AdminStats;
+export const getAdminUsers     = async () => (await api.get("/admin/users")).data     as AdminUserRow[];
+export const getAdminQueries   = async (l=50) => (await api.get(`/admin/queries?limit=${l}`)).data as AdminQueryRow[];
+export const getAdminDocuments = async () => (await api.get("/admin/documents")).data as AdminDocumentRow[];
+export const getAdminActivity  = async () => (await api.get("/admin/activity-timeline")).data    as ActivityPoint[];

@@ -1,70 +1,37 @@
-// frontend/src/context/AuthContext.tsx
-// Global auth state: who's logged in, login/signup/logout actions.
-// Wraps the whole app so any component can call useAuth().
-
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { loginUser, signupUser, getMe } from "../services/api";
 import { User } from "../types";
-
-interface AuthContextType {
-  user: User | null;
-  loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, fullName: string) => Promise<void>;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+interface Ctx { user:User|null; loading:boolean; token:string;
+  login(e:string,p:string):Promise<void>;
+  signup(e:string,p:string,n:string):Promise<void>;
+  logout():void; }
+const AuthContext = createContext<Ctx|undefined>(undefined);
+export function AuthProvider({ children }: { children:ReactNode }) {
+  const [user,    setUser]    = useState<User|null>(null);
+  const [token,   setToken]   = useState<string>(localStorage.getItem("rag_token")??"");
   const [loading, setLoading] = useState(true);
-
-  // On first load, if a token is sitting in localStorage from a previous
-  // session, validate it against the backend and restore the user —
-  // this is what keeps you logged in after a page refresh.
   useEffect(() => {
-    const restoreSession = async () => {
-      const token = localStorage.getItem("rag_token");
-      if (token) {
-        try {
-          const me = await getMe();
-          setUser(me);
-        } catch {
-          localStorage.removeItem("rag_token");
-        }
-      }
-      setLoading(false);
-    };
-    restoreSession();
+    const t = localStorage.getItem("rag_token");
+    if (!t) { setLoading(false); return; }
+    getMe().then(u => { setUser(u); setToken(t); })
+           .catch(() => localStorage.removeItem("rag_token"))
+           .finally(() => setLoading(false));
   }, []);
-
-  const login = async (email: string, password: string) => {
-    const data = await loginUser(email, password);
-    localStorage.setItem("rag_token", data.access_token);
-    setUser(data.user);
+  const login  = async (email:string, password:string) => {
+    const d = await loginUser(email, password);
+    localStorage.setItem("rag_token", d.access_token);
+    setToken(d.access_token); setUser(d.user);
   };
-
-  const signup = async (email: string, password: string, fullName: string) => {
-    const data = await signupUser(email, password, fullName);
-    localStorage.setItem("rag_token", data.access_token);
-    setUser(data.user);
+  const signup = async (email:string, password:string, full_name:string) => {
+    const d = await signupUser(email, password, full_name);
+    localStorage.setItem("rag_token", d.access_token);
+    setToken(d.access_token); setUser(d.user);
   };
-
-  const logout = () => {
-    localStorage.removeItem("rag_token");
-    setUser(null);
-  };
-
-  return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const logout = () => { localStorage.removeItem("rag_token"); setUser(null); setToken(""); };
+  return <AuthContext.Provider value={{ user, loading, token, login, signup, logout }}>{children}</AuthContext.Provider>;
 }
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider>");
-  return ctx;
-}
+export const useAuth = () => {
+  const c = useContext(AuthContext);
+  if (!c) throw new Error("useAuth must be inside <AuthProvider>");
+  return c;
+};
