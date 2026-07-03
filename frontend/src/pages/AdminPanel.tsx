@@ -83,7 +83,7 @@ export default function AdminPanel() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ color: "var(--text-dim)", fontSize: 12 }}>{user?.email}</div>
           <div style={{ background: "#A855F720", color: "#A855F7", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>ADMIN</div>
-          <button onClick={() => { logout(); navigate("/login"); }}
+          <button onClick={() => { logout(); navigate("/"); }}
             style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", color: "var(--text-dim)", fontSize: 12 }}>Logout</button>
         </div>
       </div>
