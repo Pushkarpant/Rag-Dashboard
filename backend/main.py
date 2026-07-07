@@ -1,4 +1,15 @@
+import sys
+# Windows consoles default to cp1252, which can't encode the emoji used in our
+# log statements → UnicodeEncodeError crashes startup and request handlers.
+# Force UTF-8 (with a safe fallback) so the server runs everywhere.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 import os, time, json, asyncio
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -6,7 +17,7 @@ from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 
-from backend.database import get_db, init_db
+from backend.database import get_db, init_db, SessionLocal
 from backend.models import User, Document, Query
 from backend.auth import get_current_user
 from backend.routes.auth_routes         import router as auth_router
@@ -16,21 +27,24 @@ from backend.services.rag_service        import answer_question
 from backend.services.document_processor import process_pdf, process_text_file
 from backend.services.vector_store       import delete_document_chunks
 
-app = FastAPI(title="RAG Dashboard API", version="4.0.0")
+DOCS_FOLDER = "documents"
+os.makedirs(DOCS_FOLDER, exist_ok=True)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    init_db()
+    print("✅ DB ready (rag_dashboard.db)")
+    yield
+
+
+app = FastAPI(title="RAG Dashboard API", version="4.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware,
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(convo_router)
-
-DOCS_FOLDER = "documents"
-os.makedirs(DOCS_FOLDER, exist_ok=True)
-
-@app.on_event("startup")
-def on_startup():
-    init_db()
-    print("✅ DB ready (rag_dashboard.db)")
 
 @app.get("/")
 def home():
@@ -88,30 +102,46 @@ async def upload(file: UploadFile = File(...),
     fname, uid  = file.filename, user.id
 
     async def stream():
+        # Use a fresh DB session scoped to the stream. The request-scoped `db`
+        # from Depends(get_db) may already be torn down by the time this
+        # generator runs, since it executes after the response starts.
+        stream_db = SessionLocal()
+        saved = False
         try:
             yield _sse({"stage": "Saving file…",              "pct": 10})
             await asyncio.sleep(0.05)
             with open(save_path, "wb") as f: f.write(contents)
+            saved = True
 
             yield _sse({"stage": "Extracting & splitting…",   "pct": 30})
             await asyncio.sleep(0.05)
 
             yield _sse({"stage": "Creating embeddings…",       "pct": 55})
-            result = process_pdf(save_path, owner_id=uid) if ext == ".pdf" \
-                     else process_text_file(save_path, owner_id=uid)
+            # Offload the blocking embed/index work so the event loop stays free.
+            result = await asyncio.to_thread(
+                (process_pdf if ext == ".pdf" else process_text_file),
+                save_path, uid)
 
             yield _sse({"stage": "Indexing in Pinecone…",      "pct": 85})
             await asyncio.sleep(0.05)
 
-            db.add(Document(filename=fname, owner_id=uid,
+            stream_db.add(Document(filename=fname, owner_id=uid,
                             chunks_count=result["chunks_stored"],
                             file_size_kb=round(len(contents)/1024, 1)))
-            db.commit()
+            stream_db.commit()
 
             yield _sse({"stage": "Done!", "pct": 100, "done": True,
                         "filename": fname, "chunks": result["chunks_stored"]})
         except Exception as e:
+            stream_db.rollback()
+            # Roll back the half-processed upload: remove the orphaned file so a
+            # failed upload doesn't leave a document on disk with no DB row/vectors.
+            if saved and os.path.exists(save_path):
+                try: os.remove(save_path)
+                except OSError: pass
             yield _sse({"error": str(e), "pct": 0, "done": True})
+        finally:
+            stream_db.close()
 
     return StreamingResponse(stream(),
         media_type="text/event-stream",

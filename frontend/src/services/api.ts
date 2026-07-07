@@ -1,16 +1,25 @@
 import axios from "axios";
 import { Source, Document, Stats, User, AdminStats, AdminUserRow, AdminQueryRow, AdminDocumentRow, ActivityPoint, Conversation, ConvoMessage } from "../types";
 
-const BASE = "http://localhost:8000";
+// Use 127.0.0.1 (IPv4) explicitly, not "localhost". On Windows, "localhost"
+// resolves to IPv6 ::1 first, but uvicorn's default host is 127.0.0.1 (IPv4
+// only) — so requests to localhost:8000 hit a dead IPv6 socket and fail
+// ("method not allowed" / no response). 127.0.0.1 always hits the live server.
+const BASE = "http://127.0.0.1:8000";
 const api  = axios.create({ baseURL: BASE });
 
 api.interceptors.request.use(cfg => {
-  const t = localStorage.getItem("rag_token");
-  if (t) cfg.headers = { ...cfg.headers, Authorization: `Bearer ${t}` };
+  const t = sessionStorage.getItem("rag_token");
+  if (t) cfg.headers.set("Authorization", `Bearer ${t}`);
   return cfg;
 });
 api.interceptors.response.use(r => r, e => {
-  if (e.response?.status === 401) localStorage.removeItem("rag_token");
+  // On auth failure clear the whole session (token + heartbeat) so the app
+  // falls back to logged-out state cleanly. Keys mirror AuthContext.
+  if (e.response?.status === 401) {
+    sessionStorage.removeItem("rag_token");
+    sessionStorage.removeItem("rag_seen");
+  }
   return Promise.reject(e);
 });
 

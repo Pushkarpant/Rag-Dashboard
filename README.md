@@ -1,82 +1,77 @@
 <div align="center">
 
-# 🔵 RAG Document Intelligence Dashboard
+# ✦ DocuMind — RAG Document Intelligence Dashboard
 
-### Ask questions from your documents using AI — like ChatGPT but for your private data
+### Ask questions from your documents using AI — like ChatGPT, but for your private files
 
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.138-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![Gemini](https://img.shields.io/badge/Gemini-3.5%20Flash-8E75FF?style=flat-square&logo=google&logoColor=white)](https://ai.google.dev)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
-
-**[🌐 Live Demo](#)** · **[📹 Demo Video](#)** · **[🐛 Report Bug](../../issues)**
 
 </div>
 
 ---
 
-## 📸 Screenshots
-
-> _Screenshots will be added after deployment_
-
----
-
 ## 🎯 What is This?
 
-Most companies have thousands of internal documents — risk reports, compliance papers, product docs, manuals. Finding information means **manually reading hundreds of files**.
+Most teams have thousands of internal documents — reports, compliance papers, manuals, notes. Finding
+information means **manually reading hundreds of files**.
 
-This project solves that. Upload any PDF or text document and ask questions in plain English. The AI finds the most relevant sections and gives you accurate answers with exact sources.
+DocuMind solves that. Upload a PDF or text file and ask questions in plain English. The AI retrieves the most
+relevant passages and answers with exact **source citations** and a **confidence score**.
 
-**Example:**
-> 💬 "What are the main credit risks mentioned in our Q3 report?"
-> 
-> 🤖 "Based on the Q3 Risk Report (page 12), the main credit risks are: 1) PD underestimation in low-income segments, 2) Concentration risk in real estate sector, 3) Data quality gaps..."
+> 💬 "What are the main credit risks in the Q3 report?"
+>
+> 🤖 "Based on the Q3 Risk Report (p.12), the main credit risks are: 1) PD underestimation in low-income
+> segments, 2) concentration risk in real estate, 3) data-quality gaps…" — *87% confidence · 3 sources*
 
 ---
 
 ## ✨ Features
 
-- 📄 **Upload any document** — PDF or TXT files
-- 💬 **Natural language questions** — no search keywords needed
-- 🎯 **Source citations** — exact page and document for every answer
-- ⚡ **Redis caching** — repeated questions answered instantly
-- 🔍 **Semantic search** — finds answers even with different wording
-- 📊 **Analytics dashboard** — queries, documents, response times
-- 🐳 **Docker ready** — one command to run everything
+- 📄 **Upload any document** — PDF or TXT, with real-time processing progress (SSE)
+- 💬 **Natural-language questions** — no keyword search needed
+- 🎯 **Source citations** — exact page + document for every answer
+- 📈 **Confidence scoring** — every answer rates its own reliability
+- 🔐 **Multi-tenant isolation** — each user's documents are scoped to their account
+- 🗂️ **Chat history** — conversations saved and resumable from the sidebar
+- 📊 **Admin analytics** — users, queries, confidence distribution, activity timeline
+- 🎨 **Polished, animated UI** — dark/light themes, aurora backgrounds, micro-interactions
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│                  USER BROWSER                   │
-│            React App (Port 3000)                │
-└──────────────────────┬──────────────────────────┘
-                       │ HTTP/JSON
-┌──────────────────────▼──────────────────────────┐
-│           FastAPI Backend (Port 8000)           │
-│                                                 │
-│  ┌─────────────┐     ┌──────────────────────┐  │
-│  │ RAG Service │     │  Document Processor  │  │
-│  │             │     │  (PDF → Chunks)      │  │
-│  └──────┬──────┘     └──────────┬───────────┘  │
-└─────────│──────────────────────│───────────────┘
-          │                      │
-    ┌─────▼──────┐    ┌──────────▼──────┐
-    │  Pinecone  │    │   PostgreSQL    │
-    │ (Vectors)  │    │  (History/Meta) │
-    └─────┬──────┘    └─────────────────┘
-          │
-    ┌─────▼──────┐    ┌─────────────────┐
-    │  OpenAI    │    │     Redis       │
-    │  (GPT-3.5) │    │   (Caching)    │
-    └────────────┘    └─────────────────┘
+┌───────────────────────────────────────────────┐
+│              USER BROWSER                      │
+│   React + TypeScript + Vite  (Port 3000)       │
+└───────────────────────┬───────────────────────┘
+                        │ HTTP / JSON · SSE · JWT
+┌───────────────────────▼───────────────────────┐
+│           FastAPI Backend (Port 8000)          │
+│                                                │
+│   RAG Service · Document Processor · Auth      │
+└──────┬───────────────────────┬─────────────────┘
+       │                       │
+ ┌─────▼──────┐         ┌───────▼────────┐
+ │  Pinecone  │         │    SQLite      │
+ │ (Vectors)  │         │ (users/history)│
+ └─────┬──────┘         └────────────────┘
+       │
+ ┌─────▼──────────────────────┐
+ │  Google Gemini             │
+ │  gemini-3.5-flash (answers)│
+ │  gemini-embedding-001      │
+ └────────────────────────────┘
 ```
 
 **How it works:**
-1. **Ingest** — Upload PDF → Split into 500-word chunks → Convert to vectors → Store in Pinecone
-2. **Query** — User asks question → Convert to vector → Find 5 most similar chunks → Send to GPT → Return answer with sources
+1. **Ingest** — Upload → split into ~1000-char chunks (200 overlap) → embed with Gemini → store in Pinecone.
+2. **Query** — Question → embed → retrieve top-K similar chunks (per-user filter) → Gemini generates a cited
+   answer with a confidence score.
 
 ---
 
@@ -87,59 +82,53 @@ This project solves that. Upload any PDF or text document and ask questions in p
 ```
 Python 3.11+
 Node.js 18+
-Docker & Docker Compose
 ```
 
 ### API Keys Needed
 
 | Service | Purpose | Free Tier |
 |---------|---------|-----------|
-| [OpenAI](https://platform.openai.com) | GPT + Embeddings | $5 credit |
-| [Pinecone](https://pinecone.io) | Vector Database | 100k vectors |
+| [Google AI Studio](https://ai.google.dev) | Gemini answers + embeddings | Free tier |
+| [Pinecone](https://pinecone.io) | Vector database | 100k vectors |
 
-### Installation
+> **Pinecone index:** name `rag-documents`, **dimensions `3072`**, metric `cosine`
+> (3072 is the native output of `gemini-embedding-001`).
+
+### Backend
 
 ```bash
-# 1. Clone the repo
-git clone https://github.com/Pushkarpant/rag-dashboard.git
-cd rag-dashboard
-
-# 2. Create virtual environment
+# 1. From the project root
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/Scripts/activate     # Windows (Git Bash)
+# source venv/bin/activate       # macOS / Linux
 
-# 3. Install dependencies
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 4. Setup environment variables
-cp .env.example .env
-# Edit .env with your API keys
+# 3. Configure environment
+cp backend/.env.example .env     # then edit .env with your real keys
 
-# 5. Run with Docker (easiest)
-docker-compose up
-
-# OR run manually:
-uvicorn backend.main:app --reload
+# 4. Run the API
+uvicorn backend.main:app --reload --port 8000
 ```
 
-### Environment Variables
-
-```bash
-# .env file
-OPENAI_API_KEY=sk-your-key-here
-PINECONE_API_KEY=your-pinecone-key
-PINECONE_INDEX_NAME=rag-documents
-DATABASE_URL=postgresql://user:pass@localhost/ragdb
-REDIS_URL=redis://localhost:6379
-```
-
-### Running the Frontend
+### Frontend
 
 ```bash
 cd frontend
 npm install
-npm start
-# Opens at localhost:3000
+npm run dev        # opens http://localhost:3000
+```
+
+The first account you sign up with automatically becomes **admin**.
+
+### Environment Variables (`.env`)
+
+```bash
+GEMINI_API_KEY=your-gemini-api-key
+PINECONE_API_KEY=your-pinecone-key
+PINECONE_INDEX_NAME=rag-documents
+JWT_SECRET=<64-char hex — python -c "import secrets; print(secrets.token_hex(32))">
 ```
 
 ---
@@ -148,33 +137,24 @@ npm start
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/` | Health check |
-| `POST` | `/ask` | Ask a question |
-| `POST` | `/documents/upload` | Upload a document |
-| `GET` | `/documents/stats` | Get document statistics |
-| `GET` | `/history` | Get question history |
+| `GET`    | `/`                       | Health check |
+| `POST`   | `/auth/signup`            | Create account (first = admin) |
+| `POST`   | `/auth/login`             | Log in, returns JWT |
+| `GET`    | `/auth/me`                | Current user |
+| `POST`   | `/ask`                    | Ask a question (auth) |
+| `POST`   | `/documents/upload`       | Upload a document — SSE progress (auth) |
+| `GET`    | `/documents`              | List your documents (auth) |
+| `DELETE` | `/documents/{filename}`   | Delete a document + its vectors (auth) |
+| `GET`    | `/stats`                  | Your usage stats (auth) |
+| `GET`    | `/conversations`          | Chat history (auth) |
+| `GET`    | `/admin/*`                | Platform analytics (admin only) |
 
-**Ask a Question:**
+**Ask a question:**
 ```bash
 curl -X POST http://localhost:8000/ask \
+  -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
-  -d '{"question": "What is credit risk?", "top_k": 5}'
-```
-
-**Response:**
-```json
-{
-  "answer": "Credit risk is the risk of loss...",
-  "sources": [
-    {
-      "filename": "risk_report_q3.pdf",
-      "page": 12,
-      "relevance_score": 0.94,
-      "excerpt": "Credit risk refers to..."
-    }
-  ],
-  "chunks_used": 5
-}
+  -d '{"question": "What is credit risk?", "top_k": 7}'
 ```
 
 ---
@@ -182,80 +162,60 @@ curl -X POST http://localhost:8000/ask \
 ## 🗂️ Project Structure
 
 ```
-rag-dashboard/
-│
+rag_dashboard/
 ├── backend/
-│   ├── main.py                 # FastAPI app + routes
-│   ├── config.py               # Settings + env vars
-│   ├── routes/
-│   │   ├── ask.py              # Question endpoint
-│   │   └── documents.py        # Upload endpoint
+│   ├── main.py                    # FastAPI app + /ask + /documents + /stats
+│   ├── config.py                  # Settings + env vars
+│   ├── auth.py                    # JWT + password hashing
+│   ├── database.py · models.py    # SQLAlchemy (SQLite)
+│   ├── routes/                    # auth · admin · conversations
 │   └── services/
-│       ├── rag_service.py      # Core RAG logic
-│       ├── embedding_service.py # OpenAI embeddings
-│       ├── vector_store.py     # Pinecone operations
-│       └── document_processor.py # PDF processing
-│
+│       ├── rag_service.py         # Retrieval + Gemini answer + confidence
+│       ├── embedding_service.py   # Gemini embeddings
+│       ├── vector_store.py        # Pinecone upsert / query / delete
+│       └── document_processor.py  # PDF/TXT → chunks
 ├── frontend/
 │   └── src/
-│       ├── components/
-│       │   ├── ChatInterface.tsx
-│       │   ├── MessageBubble.tsx
-│       │   ├── SourceCard.tsx
-│       │   └── UploadDocument.tsx
-│       └── services/
-│           └── api.ts
-│
-├── documents/                  # Uploaded files
-├── docker-compose.yml
-├── Dockerfile
+│       ├── pages/                 # Landing · Login · Signup · Dashboard · AdminPanel
+│       ├── components/ · hooks/   # Aurora, ProtectedRoute, useInView, useCountUp
+│       ├── context/AuthContext.tsx
+│       └── services/api.ts
+├── documents/                     # Uploaded files (per-user folders)
 ├── requirements.txt
-└── .env.example
+└── .env
 ```
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| Backend | FastAPI (Python) | REST API server |
-| AI/LLM | OpenAI GPT-3.5 | Answer generation |
-| Embeddings | OpenAI ada-002 | Text to vectors |
-| Vector DB | Pinecone | Semantic search |
-| Cache | Redis | Response caching |
-| Database | PostgreSQL | History + metadata |
-| Frontend | React + TypeScript | User interface |
-| Container | Docker | Deployment |
+| Layer | Technology |
+|-------|-----------|
+| Backend    | FastAPI (Python) |
+| AI / LLM   | Google Gemini `gemini-3.5-flash` |
+| Embeddings | Gemini `gemini-embedding-001` (3072-d) |
+| Vector DB  | Pinecone |
+| Database   | SQLite (SQLAlchemy) |
+| Auth       | JWT (PyJWT) + Passlib (pbkdf2_sha256) |
+| Frontend   | React + TypeScript + Vite + Recharts |
 
 ---
 
 ## 🎓 Key Concepts
 
-**What is RAG?**
+**What is RAG?** Retrieval-Augmented Generation. Instead of training the model on your data, we retrieve
+relevant chunks at query time and give them to Gemini as context — so answers stay grounded in *your*
+documents, cite their sources, and always reflect the latest uploads.
 
-Retrieval-Augmented Generation. Instead of training GPT on your data (expensive), we retrieve relevant document chunks at query time and give them to GPT as context. This means:
-- ✅ Works with any documents
-- ✅ Always uses latest information
-- ✅ Answers with exact sources
-- ✅ No training cost
-
-**Why Pinecone?**
-
-Normal search finds exact keyword matches. Pinecone uses vector similarity — it finds documents with the same *meaning*, even if different words are used.
-
-**Why Redis caching?**
-
-OpenAI calls cost money and take ~3 seconds. Same question asked twice? Return cached answer in <10ms at zero cost.
+**Why vector search?** Keyword search finds exact matches. Vector embeddings find passages with the same
+*meaning*, even when the wording differs.
 
 ---
 
 ## 📝 License
 
-MIT License — see [LICENSE](LICENSE)
-
----
+MIT License
 
 <div align="center">
-  Built with ❤️ by <a href="https://github.com/Pushkarpant">Pushkar</a>
+  Built with ✦ Gemini · Pinecone · FastAPI · React
 </div>

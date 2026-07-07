@@ -6,7 +6,11 @@ class Settings:
     GEMINI_API_KEY:        str   = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL:          str   = "gemini-3.5-flash"
     EMBEDDING_MODEL:       str   = "gemini-embedding-001"
-    EMBEDDING_DIMENSIONS:  int   = 768
+    # gemini-embedding-001 returns 3072-dim vectors natively, and the live
+    # Pinecone index is created with 3072 dims. This MUST match the index —
+    # it is used to build the dummy query vector in delete_document_chunks(),
+    # and a mismatch makes every document deletion silently fail.
+    EMBEDDING_DIMENSIONS:  int   = 3072
     PINECONE_API_KEY:      str   = os.getenv("PINECONE_API_KEY", "")
     PINECONE_INDEX:        str   = os.getenv("PINECONE_INDEX_NAME", "rag-documents")
     JWT_SECRET:            str   = os.getenv("JWT_SECRET", "dev-only-insecure-secret-change-me")

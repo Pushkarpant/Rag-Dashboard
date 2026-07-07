@@ -48,7 +48,37 @@ DOCUMENT CONTEXT:
 QUESTION: {question}
 
 ANSWER (based strictly on the documents above):"""
-    return model.generate_content(prompt).text.strip()
+    return _safe_generate(prompt) or \
+        "I couldn't generate an answer for that. Please try rephrasing your question."
+
+
+def _safe_generate(prompt: str) -> str:
+    """Call Gemini and pull out the text defensively.
+
+    `response.text` raises when the model returns no candidate (safety block,
+    empty finish, recitation stop, …). Guard it so /ask degrades gracefully
+    instead of throwing a 500.
+    """
+    try:
+        resp = model.generate_content(prompt)
+    except Exception as e:
+        print(f"  ⚠ Gemini call failed: {e}")
+        return ""
+    # Prefer the convenience accessor, but fall back to manual part extraction.
+    try:
+        if resp.text and resp.text.strip():
+            return resp.text.strip()
+    except Exception:
+        pass
+    try:
+        for cand in (resp.candidates or []):
+            parts = getattr(getattr(cand, "content", None), "parts", None) or []
+            text = "".join(getattr(p, "text", "") for p in parts).strip()
+            if text:
+                return text
+    except Exception as e:
+        print(f"  ⚠ Could not extract answer text: {e}")
+    return ""
 
 def generate_followups(question: str, answer: str) -> List[str]:
     prompt = f"""Generate exactly 3 short follow-up questions (under 10 words each) based on:

@@ -33,7 +33,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if not token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Not authenticated")
     payload = decode_access_token(token)
-    user = db.query(User).filter(User.id == int(payload.get("sub"))).first()
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid authentication token.")
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(401, "User not found")
     return user

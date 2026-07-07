@@ -5,19 +5,23 @@ import { useAuth } from "../context/AuthContext";
 import { getAdminStats, getAdminUsers, getAdminQueries, getAdminDocuments, getAdminActivity } from "../services/api";
 import { AdminStats, AdminUserRow, AdminQueryRow, AdminDocumentRow, ActivityPoint } from "../types";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { useCountUp } from "../hooks/useCountUp";
 
 type Tab = "overview" | "users" | "queries" | "documents";
 
-function KPI({ label, value, icon, color, sub }: { label: string; value: string | number; icon: string; color: string; sub?: string }) {
+function KPI({ label, value, icon, color, sub, index = 0, decimals = 0, prefix = "", suffix = "" }:
+  { label: string; value: number; icon: string; color: string; sub?: string; index?: number; decimals?: number; prefix?: string; suffix?: string }) {
+  const shown = useCountUp(value, { duration: 1100, decimals });
   return (
-    <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "18px 20px", flex: "1 1 160px", minWidth: 150, transition: "border-color .2s, transform .2s" }}
-      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = color + "40"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-2px)"; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLDivElement).style.transform = ""; }}>
+    <div className="fade-up" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "18px 20px", flex: "1 1 160px", minWidth: 150, position: "relative", overflow: "hidden", transition: "border-color .2s, transform .2s, box-shadow .2s", animationDelay: `${index * 70}ms`, opacity: 0 }}
+      onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.borderColor = color + "60"; (e.currentTarget as HTMLDivElement).style.transform = "translateY(-3px)"; (e.currentTarget as HTMLDivElement).style.boxShadow = `0 12px 30px ${color}20`; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.borderColor = "var(--border)"; (e.currentTarget as HTMLDivElement).style.transform = ""; (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg,${color},transparent)` }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
         <span style={{ color: "var(--text-dim)", fontSize: 11, fontWeight: 600, letterSpacing: 0.5 }}>{label.toUpperCase()}</span>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: color + "18", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>{icon}</div>
       </div>
-      <div style={{ color, fontSize: 28, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", lineHeight: 1 }}>{value}</div>
+      <div style={{ color, fontSize: 28, fontWeight: 800, fontFamily: "'JetBrains Mono',monospace", lineHeight: 1 }}>{prefix}{shown}{suffix}</div>
       {sub && <div style={{ color: "var(--text-dim)", fontSize: 11, marginTop: 6 }}>{sub}</div>}
     </div>
   );
@@ -40,7 +44,11 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-const PIE_COLORS = ["#10B981", "#F59E0B", "#EF4444"];
+// On-brand sage palette. Confidence buckets keep a semantic ramp
+// (sage = high, gold = medium, clay-red = low) but stay within the brand.
+const PIE_COLORS = ["#54c750", "#B08430", "#BC5646"];
+// Confidence → brand color (shared by pie, badges, tables)
+const confColor = (c: number) => (c >= 70 ? "#54c750" : c >= 50 ? "#B08430" : "#BC5646");
 
 export default function AdminPanel() {
   const { user, logout } = useAuth();
@@ -76,15 +84,18 @@ export default function AdminPanel() {
           <Link to="/dashboard" style={{ color: "var(--text-dim)", fontSize: 12, textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>← Dashboard</Link>
           <div style={{ width: 1, height: 18, background: "var(--border)" }} />
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 7, background: "linear-gradient(135deg,#6366F1,#06B6D4)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>⚙</div>
+            <div style={{ width: 28, height: 28, borderRadius: 7, background: "var(--grad)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, boxShadow: "0 0 12px #54c75055" }}>⚙</div>
             <span style={{ fontWeight: 700, fontSize: 15 }}>Admin Panel</span>
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={{ color: "var(--text-dim)", fontSize: 12 }}>{user?.email}</div>
-          <div style={{ background: "#A855F720", color: "#A855F7", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>ADMIN</div>
-          <button onClick={() => { logout(); navigate("/"); }}
-            style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", color: "var(--text-dim)", fontSize: 12 }}>Logout</button>
+          <div style={{ background: "#54c75022", color: "#54c750", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>ADMIN</div>
+          <button onClick={() => { logout(); navigate("/"); }} title="Log out"
+            style={{ background: "#e0685614", border: "1px solid #e0685655", borderRadius: 8, padding: "6px 13px", color: "#e06856", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, transition: "all .2s" }}
+            onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "#e06856"; b.style.color = "#fff"; b.style.borderColor = "#e06856"; }}
+            onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "#e0685614"; b.style.color = "#e06856"; b.style.borderColor = "#e0685655"; }}>
+            <span style={{ fontSize: 14, lineHeight: 1 }}>⏻</span> Logout</button>
         </div>
       </div>
 
@@ -100,16 +111,16 @@ export default function AdminPanel() {
           <>
             {/* KPI row */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24 }} className="kpi-wrap">
-              <KPI label="Users"        value={stats?.total_users ?? 0}      icon="👥" color="#6366F1" />
-              <KPI label="Documents"    value={stats?.total_documents ?? 0}   icon="📁" color="#06B6D4" />
-              <KPI label="Questions"    value={stats?.total_queries ?? 0}     icon="❓" color="#F59E0B" />
-              <KPI label="Chunks"       value={stats?.total_chunks ?? 0}      icon="🧩" color="#10B981" />
-              <KPI label="Avg Conf."    value={`${stats?.avg_confidence?.toFixed(1) ?? 0}%`} icon="🎯" color="#A855F7" />
-              <KPI label="Avg Response" value={`${Math.round(stats?.avg_response_time_ms ?? 0)}ms`} icon="⚡" color="#EC4899" />
+              <KPI index={0} label="Users"        value={stats?.total_users ?? 0}      icon="👥" color="#54c750" />
+              <KPI index={1} label="Documents"    value={stats?.total_documents ?? 0}   icon="📁" color="#6fd96b" />
+              <KPI index={2} label="Questions"    value={stats?.total_queries ?? 0}     icon="❓" color="#B08430" />
+              <KPI index={3} label="Chunks"       value={stats?.total_chunks ?? 0}      icon="🧩" color="#3aa336" />
+              <KPI index={4} label="Avg Conf."    value={stats?.avg_confidence ?? 0}    icon="🎯" color="#54c750" decimals={1} suffix="%" />
+              <KPI index={5} label="Avg Response" value={Math.round(stats?.avg_response_time_ms ?? 0)} icon="⚡" color="#6fd96b" suffix="ms" />
             </div>
 
             {/* Charts row */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, marginBottom: 24 }} className="admin-grid">
+            <div className="fade-up admin-grid" style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 16, marginBottom: 24, animationDelay: "220ms", opacity: 0 }}>
               {/* Activity chart */}
               <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, padding: "20px 20px 8px" }}>
                 <div style={{ color: "var(--text-muted)", fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Query Activity — Last 14 Days</div>
@@ -117,15 +128,15 @@ export default function AdminPanel() {
                   <AreaChart data={activity} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="aGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#6366F1" stopOpacity={0.4} />
-                        <stop offset="100%" stopColor="#6366F1" stopOpacity={0} />
+                        <stop offset="0%" stopColor="#54c750" stopOpacity={0.45} />
+                        <stop offset="100%" stopColor="#54c750" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                     <XAxis dataKey="date" stroke="var(--text-dim)" fontSize={11} tickLine={false} axisLine={false} />
                     <YAxis stroke="var(--text-dim)" fontSize={11} tickLine={false} axisLine={false} allowDecimals={false} />
-                    <Tooltip contentStyle={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} labelStyle={{ color: "var(--text-muted)" }} itemStyle={{ color: "#6366F1" }} />
-                    <Area type="monotone" dataKey="queries" stroke="#6366F1" strokeWidth={2} fill="url(#aGrad)" />
+                    <Tooltip contentStyle={{ background: "var(--surface2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} labelStyle={{ color: "var(--text-muted)" }} itemStyle={{ color: "#54c750" }} />
+                    <Area type="monotone" dataKey="queries" stroke="#54c750" strokeWidth={2} fill="url(#aGrad)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -161,18 +172,19 @@ export default function AdminPanel() {
             {/* Tab nav */}
             <div style={{ display: "flex", gap: 4, marginBottom: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 4, width: "fit-content" }}>
               {(["overview", "users", "queries", "documents"] as Tab[]).map(t => (
-                <button key={t} onClick={() => setTab(t)} style={{
+                <button key={t} onClick={() => setTab(t)} className="press" style={{
                   padding: "7px 16px", background: tab === t ? "var(--surface2)" : "transparent",
                   borderRadius: 7, color: tab === t ? "var(--text)" : "var(--text-dim)",
                   fontSize: 12, fontWeight: 600, textTransform: "capitalize",
-                  border: tab === t ? "1px solid var(--border)" : "1px solid transparent"
+                  border: tab === t ? "1px solid var(--border)" : "1px solid transparent",
+                  boxShadow: tab === t ? "0 2px 10px #54c75020" : "none"
                 }}>{t}</button>
               ))}
             </div>
 
             {/* Overview */}
             {tab === "overview" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }} className="admin-grid">
+              <div key="overview" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }} className="admin-grid fade-in">
                 {[
                   { title: "Recent Questions", rows: queries.slice(0, 8), render: (q: AdminQueryRow) => (
                     <div key={q.id} style={{ padding: "11px 14px", borderBottom: "1px solid var(--surface2)" }}>
@@ -204,7 +216,7 @@ export default function AdminPanel() {
 
             {/* Users */}
             {tab === "users" && (
-              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
+              <div key="users" className="fade-in" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead><tr>
                     <th style={thS}>Name</th><th style={thS}>Email</th><th style={thS}>Role</th>
@@ -215,7 +227,7 @@ export default function AdminPanel() {
                       <tr key={u.id}>
                         <td style={tdS}>{u.full_name}</td>
                         <td style={tdS}>{u.email}</td>
-                        <td style={tdS}><Badge text={u.role} color={u.role === "admin" ? "#A855F7" : "#64748B"} /></td>
+                        <td style={tdS}><Badge text={u.role} color={u.role === "admin" ? "#54c750" : "#8A8A7E"} /></td>
                         <td style={tdS}>{u.documents}</td>
                         <td style={tdS}>{u.queries}</td>
                         <td style={{ ...tdS, color: "var(--text-dim)" }}>{timeAgo(u.created_at)}</td>
@@ -229,7 +241,7 @@ export default function AdminPanel() {
 
             {/* Queries */}
             {tab === "queries" && (
-              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
+              <div key="queries" className="fade-in" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead><tr>
                     <th style={thS}>Question</th><th style={thS}>User</th>
@@ -241,7 +253,7 @@ export default function AdminPanel() {
                       <tr key={q.id}>
                         <td style={{ ...tdS, maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{q.question}</td>
                         <td style={tdS}>{q.user_email}</td>
-                        <td style={tdS}><Badge text={`${q.confidence}%`} color={q.confidence >= 70 ? "#10B981" : q.confidence >= 50 ? "#F59E0B" : "#EF4444"} /></td>
+                        <td style={tdS}><Badge text={`${q.confidence}%`} color={confColor(q.confidence)} /></td>
                         <td style={tdS}>{q.chunks_used}</td>
                         <td style={{ ...tdS, fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }}>{q.response_time_ms}ms</td>
                         <td style={{ ...tdS, color: "var(--text-dim)" }}>{timeAgo(q.created_at)}</td>
@@ -255,7 +267,7 @@ export default function AdminPanel() {
 
             {/* Documents */}
             {tab === "documents" && (
-              <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
+              <div key="documents" className="fade-in" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead><tr>
                     <th style={thS}>Filename</th><th style={thS}>Owner</th>
