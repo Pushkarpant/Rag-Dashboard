@@ -34,7 +34,7 @@ os.makedirs(DOCS_FOLDER, exist_ok=True)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()
-    print("✅ DB ready (rag_dashboard.db)")
+    print("✅ DB ready (PostgreSQL)")
     yield
 
 
