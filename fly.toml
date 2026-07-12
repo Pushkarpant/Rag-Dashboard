@@ -1,0 +1,37 @@
+# fly.toml — Verity (RAG dashboard) on Fly.io
+#
+# `fly launch` normally generates this; it's checked in so deploys are
+# reproducible. Change `app` to your own unique name before first deploy
+# (or let `fly launch` rename it).
+
+app = "verity-rag"
+primary_region = "iad"          # us-east (near Pinecone AWS us-east-1). Pick your own.
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Non-secret config. Real secrets (API keys, DATABASE_URL) go in `fly secrets`.
+  PINECONE_INDEX_NAME = "rag-documents"
+
+[http_service]
+  internal_port = 8080          # must match the port uvicorn binds in the Dockerfile
+  force_https = true
+  auto_stop_machines = "stop"   # scale to zero when idle → no cost while unused
+  auto_start_machines = true    # cold-start on the next request
+  min_machines_running = 0
+
+  [http_service.http_options]
+    # SSE upload progress (/documents/upload) streams for a while; don't buffer.
+    idle_timeout = 120
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/healthz"           # lightweight liveness route in backend/main.py
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "20s"        # allow app import + DB connect on boot
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"                # embeddings/rerank are API calls; 1 GB is plenty

@@ -1,0 +1,40 @@
+# Production runtime dependencies for the Verity backend (Fly.io image).
+#
+# This is a DELIBERATELY SLIM subset of requirements.txt. The full file pins
+# torch / transformers / sentence-transformers / scikit-learn / scipy (~3 GB),
+# which were only needed when reranking ran locally. Reranking now goes through
+# the Cohere API (backend/services/reranker.py), so none of that is imported at
+# runtime — shipping it would bloat the image and slow every deploy for nothing.
+#
+# Only top-level packages are pinned here (versions match requirements.txt);
+# pip resolves their transitive deps. If you add a backend import, add it here.
+
+# ── Web server ───────────────────────────────────────────────────────────────
+fastapi==0.138.1
+uvicorn==0.49.0
+python-multipart==0.0.32          # UploadFile / multipart form parsing
+
+# ── Data / models ────────────────────────────────────────────────────────────
+pydantic==2.13.4
+email-validator==2.3.0            # pydantic EmailStr in auth routes
+
+# ── Database (PostgreSQL via psycopg v3) ─────────────────────────────────────
+SQLAlchemy==2.0.51
+psycopg==3.3.4
+psycopg-binary==3.3.4
+
+# ── Auth / config ────────────────────────────────────────────────────────────
+python-dotenv==1.2.2
+PyJWT==2.13.0
+passlib==1.7.4                    # pbkdf2_sha256 (no bcrypt backend needed)
+
+# ── RAG pipeline: generation, embeddings, vectors, rerank ────────────────────
+openai==2.44.0                    # drives Groq via its OpenAI-compatible endpoint
+google-generativeai==0.8.6        # embeddings only (gemini-embedding-001, 3072-d)
+pinecone==9.1.0
+cohere==7.0.5
+
+# ── Document ingestion (PDF/TXT → chunks) ────────────────────────────────────
+langchain-community==0.4.2
+langchain-text-splitters==1.1.2
+pypdf==6.14.2

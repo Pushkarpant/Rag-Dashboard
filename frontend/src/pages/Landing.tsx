@@ -27,7 +27,7 @@ function ThemeToggle() {
 }
 
 const FEATURES = [
-  { icon: "🧠", title: "Gemini AI Brain",   desc: "Powered by Google's Gemini 3.5 Flash — fast, accurate answers grounded in your private documents." },
+  { icon: "🧠", title: "Llama 3.3 70B Brain", desc: "Powered by Meta's Llama 3.3 70B on Groq — blazing-fast, accurate answers grounded in your private documents." },
   { icon: "🔍", title: "Semantic Search",    desc: "Vector embeddings via Pinecone find answers by meaning, not just keyword matching." },
   { icon: "🔐", title: "Private by Design",  desc: "Multi-tenant isolation — every user's documents are scoped to their account only." },
   { icon: "📊", title: "Admin Analytics",    desc: "Real-time platform dashboard: query volume, confidence trends, user activity, document inventory." },
@@ -104,7 +104,7 @@ export default function Landing() {
             <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--grad)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 16, boxShadow: "0 0 16px #54c75060", animation: "float 4s ease-in-out infinite" }}>✦</div>
-            <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: "-.3px" }}>DocuMind</span>
+            <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: "-.3px" }}>Verity</span>
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <ThemeToggle />
@@ -127,7 +127,7 @@ export default function Landing() {
               <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#54c750",
                 boxShadow: "0 0 8px #54c750", animation: "pulse 2s infinite" }} />
               <span style={{ color: "#54c750", fontSize: 12, fontWeight: 600 }}>
-                Powered by Gemini 3.5 Flash + Pinecone
+                Powered by Gemini + Groq + Pinecone
               </span>
             </div>
 
@@ -162,7 +162,7 @@ export default function Landing() {
 
             <p style={{ color: "var(--text-dim)", fontSize: 12, marginTop: 18,
               animation: "fadeUp .6s .4s ease both" }}>
-              No credit card required · Free Gemini API tier · First signup becomes admin
+              No credit card required · Free-tier friendly · First signup becomes admin
             </p>
           </div>
         </section>
@@ -179,7 +179,7 @@ export default function Landing() {
                   <div key={c} style={{ width: 10, height: 10, borderRadius: "50%", background: c }} />
                 ))}
                 <span style={{ color: "var(--text-dim)", fontSize: 12, marginLeft: 8 }}>
-                  DocuMind — Document Intelligence
+                  Verity — Document Intelligence
                 </span>
               </div>
               <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
@@ -271,10 +271,10 @@ export default function Landing() {
           flexWrap: "wrap", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontSize: 16 }}>✦</span>
-            <span style={{ fontWeight: 700 }}>DocuMind</span>
+            <span style={{ fontWeight: 700 }}>Verity</span>
           </div>
           <span style={{ color: "var(--text-dim)", fontSize: 12 }}>
-            Built with Gemini · Pinecone · FastAPI · React
+            Built with Groq · Gemini · Llama · Pinecone · FastAPI · React
           </span>
         </footer>
       </div>

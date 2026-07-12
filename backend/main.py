@@ -12,11 +12,13 @@ import os, time, json, asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 from sqlalchemy.orm import Session
 
+from backend.config import settings
 from backend.database import get_db, init_db, SessionLocal
 from backend.models import User, Document, Query
 from backend.auth import get_current_user
@@ -38,7 +40,7 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="RAG Dashboard API", version="4.0.0", lifespan=lifespan)
+app = FastAPI(title="Verity API", version="4.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware,
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
@@ -46,8 +48,9 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(convo_router)
 
-@app.get("/")
-def home():
+@app.get("/healthz")
+def healthz():
+    # Lightweight liveness endpoint for the Fly health check — no DB/network hit.
     return {"status": "ok", "version": "4.0.0"}
 
 class QuestionRequest(BaseModel):
@@ -179,5 +182,30 @@ def stats(db: Session = Depends(get_db),
     qc   = db.query(Query).filter(Query.user_id == user.id).count()
     return {"total_chunks": sum(d.chunks_count for d in docs),
             "total_documents": len(docs), "total_queries": qc,
-            "model": "gemini-3.5-flash",
+            "model": settings.GROQ_MODEL,
             "status": "ready" if docs else "no_documents"}
+
+
+# ── Serve the built React SPA (single-origin deploy) ─────────────────────────
+# In production the Vite build is copied to backend/static (see Dockerfile).
+# The frontend calls the API by relative URL (services/api.ts BASE="" in PROD),
+# so API and UI share one origin — no CORS, one Fly app. Mounted LAST so the API
+# routes above win; the catch-all returns index.html for client-side routes
+# (/dashboard, /admin, …) so a hard refresh doesn't 404. Absent in dev (run Vite
+# separately), so we guard on the directory existing.
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(STATIC_DIR):
+    # Real build assets (JS/CSS/fonts) live under /assets — serve them directly.
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")),
+              name="assets")
+
+    _INDEX = os.path.join(STATIC_DIR, "index.html")
+
+    @app.get("/{full_path:path}")
+    def spa(full_path: str):
+        # A concrete file in the build (favicon, etc.) → serve it; otherwise fall
+        # through to index.html so React Router handles the route in the browser.
+        candidate = os.path.join(STATIC_DIR, full_path)
+        if full_path and os.path.isfile(candidate):
+            return FileResponse(candidate)
+        return FileResponse(_INDEX)

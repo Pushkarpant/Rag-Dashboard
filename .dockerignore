@@ -1,0 +1,45 @@
+# Keep the build context small & the image clean. Anything not needed to build
+# the SPA or run the API is excluded — this also avoids leaking secrets/data.
+
+# Secrets & local env
+.env
+.env.*
+backend/.env
+backend/.env.*
+
+# Python virtualenvs & caches
+venv/
+.venv/
+eval/.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pkl
+
+# Node / Vite build artifacts (rebuilt inside the image)
+frontend/node_modules/
+frontend/dist/
+node_modules/
+
+# User-uploaded / sample documents — ephemeral, not part of the image.
+# Vectors live in Pinecone, metadata in Postgres.
+documents/
+*.pdf
+
+# Evaluation harness (separate venv, not deployed)
+eval/
+alembic/
+alembic.ini
+scripts/
+
+# Dev/meta files
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+*.md
+*.log
+
+# The heavy full requirements file — the image uses requirements-deploy.txt
+requirements.txt

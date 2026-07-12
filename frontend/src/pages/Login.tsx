@@ -59,7 +59,7 @@ export default function Login() {
           </Link>
           <h1 style={{ color:"var(--text)", fontSize:22, fontWeight:800,
             marginBottom:6, letterSpacing:"-0.5px" }}>Welcome back</h1>
-          <p style={{ color:"var(--text-dim)", fontSize:13 }}>Sign in to DocuMind</p>
+          <p style={{ color:"var(--text-dim)", fontSize:13 }}>Sign in to Verity</p>
         </div>
 
         <form onSubmit={submit} className="grad-border" style={{ background:"var(--surface)",

@@ -509,7 +509,7 @@ export default function Dashboard() {
               display:"flex", alignItems:"center", justifyContent:"center",
               fontSize:17, boxShadow:"0 0 14px #54c75045" }}>✦</div>
             <div>
-              <div style={{ fontWeight:700, fontSize:15, letterSpacing:.2 }}>DocuMind</div>
+              <div style={{ fontWeight:700, fontSize:15, letterSpacing:.2 }}>Verity</div>
               <div style={{ color:"var(--text-dim)", fontSize:10 }}>AI Document Intelligence</div>
             </div>
           </div>

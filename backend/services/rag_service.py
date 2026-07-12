@@ -1,23 +1,25 @@
-import google.generativeai as genai
+from openai import OpenAI
 from backend.services.vector_store import search_similar
+from backend.services.reranker import rerank_chunks
 from backend.config import settings
 from typing import Dict, List
 import re
 
-genai.configure(api_key=settings.GEMINI_API_KEY)
+# Generation runs on Groq via its OpenAI-compatible endpoint (same `openai` SDK,
+# different base_url). Groq/Llama has no "safety_settings" concept — the harm
+# categories that Gemini needed are simply gone. Sampling params (temperature,
+# max_tokens) move into each request below.
+#
+# The client is built lazily: the OpenAI SDK raises at construction if the key is
+# empty, so eager creation would crash app startup whenever GROQ_API_KEY is unset.
+# Lazy init keeps import safe; a missing key then fails softly inside _safe_generate.
+_client: OpenAI | None = None
 
-model = genai.GenerativeModel(
-    model_name=settings.GEMINI_MODEL,
-    generation_config=genai.types.GenerationConfig(
-        temperature=0.1, top_p=0.8, top_k=40, max_output_tokens=1500
-    ),
-    safety_settings=[
-        {"category": "HARM_CATEGORY_HARASSMENT",        "threshold": "BLOCK_ONLY_HIGH"},
-        {"category": "HARM_CATEGORY_HATE_SPEECH",       "threshold": "BLOCK_ONLY_HIGH"},
-        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH"},
-        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH"},
-    ]
-)
+def _get_client() -> OpenAI:
+    global _client
+    if _client is None:
+        _client = OpenAI(api_key=settings.GROQ_API_KEY, base_url=settings.GROQ_BASE_URL)
+    return _client
 
 def normalise_score(raw: float) -> int:
     lo, hi = settings.SCORE_MIN, settings.SCORE_MAX
@@ -53,29 +55,26 @@ ANSWER (based strictly on the documents above):"""
 
 
 def _safe_generate(prompt: str) -> str:
-    """Call Gemini and pull out the text defensively.
+    """Call Groq (OpenAI-compatible) and pull out the text defensively.
 
-    `response.text` raises when the model returns no candidate (safety block,
-    empty finish, recitation stop, …). Guard it so /ask degrades gracefully
-    instead of throwing a 500.
+    The network call can fail (rate limit, timeout, bad key) and, rarely, a
+    response can come back with no usable content. Guard both so /ask degrades
+    gracefully to a fallback message instead of throwing a 500.
     """
     try:
-        resp = model.generate_content(prompt)
+        resp = _get_client().chat.completions.create(
+            model=settings.GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.1,
+            max_tokens=1500,
+        )
     except Exception as e:
-        print(f"  ⚠ Gemini call failed: {e}")
+        print(f"  ⚠ Groq call failed: {e}")
         return ""
-    # Prefer the convenience accessor, but fall back to manual part extraction.
     try:
-        if resp.text and resp.text.strip():
-            return resp.text.strip()
-    except Exception:
-        pass
-    try:
-        for cand in (resp.candidates or []):
-            parts = getattr(getattr(cand, "content", None), "parts", None) or []
-            text = "".join(getattr(p, "text", "") for p in parts).strip()
-            if text:
-                return text
+        text = (resp.choices[0].message.content or "").strip()
+        if text:
+            return text
     except Exception as e:
         print(f"  ⚠ Could not extract answer text: {e}")
     return ""
@@ -88,9 +87,12 @@ Answer snippet: {answer[:300]}
 
 Return only 3 questions, one per line, no numbering or bullets."""
     try:
+        raw = _safe_generate(prompt)
         lines = [re.sub(r'^[\d\.\-\*\•]\s*', '', l.strip())
-                 for l in model.generate_content(prompt).text.strip().split('\n')
+                 for l in raw.strip().split('\n')
                  if l.strip()]
+        if not lines:
+            raise ValueError("no follow-ups generated")
         return lines[:3]
     except Exception:
         return ["Can you provide more details?",
@@ -106,16 +108,25 @@ def format_context(chunks: List[Dict]) -> str:
     ]
     return sep + sep.join(parts) + sep
 
-def answer_question(question: str, top_k: int = 7,
+def answer_question(question: str, top_k: int = None,
                     user_id: int = None) -> Dict:
+    # `top_k` is kept for API compatibility but no longer drives the counts:
+    # retrieval width and final size are governed by config (retrieve-then-rerank).
     print(f"\n🔍 '{question}' (user={user_id})")
-    chunks = search_similar(question, top_k=top_k, user_id=user_id)
-    print(f"  📦 {len(chunks)} chunks retrieved")
 
-    if not chunks:
+    # 1) Retrieve a WIDE candidate set from Pinecone (no cosine pre-filter, so the
+    #    reranker judges everything). 2) Cross-encoder rerank down to the best few.
+    candidates = search_similar(question, top_k=settings.RETRIEVAL_CANDIDATES,
+                                user_id=user_id, min_score=0.0)
+    print(f"  📦 {len(candidates)} candidates retrieved")
+
+    if not candidates:
         return {"answer": "No documents found. Please upload some documents first.",
                 "sources": [], "question": question,
                 "confidence": 0, "suggestions": [], "chunks_used": 0}
+
+    chunks = rerank_chunks(question, candidates, top_n=settings.RERANK_TOP_N)
+    print(f"  🎯 {len(chunks)} chunks after rerank")
 
     context  = format_context(chunks)
     answer   = generate_answer(question, context)

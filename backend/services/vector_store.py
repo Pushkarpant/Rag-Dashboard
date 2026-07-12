@@ -29,14 +29,20 @@ def store_chunks(chunks: List[Dict]) -> int:
     return total
 
 def search_similar(query: str, top_k: int = 7,
-                   user_id: Optional[int] = None) -> List[Dict]:
+                   user_id: Optional[int] = None,
+                   min_score: Optional[float] = None) -> List[Dict]:
+    # min_score defaults to the configured floor. Callers that rerank downstream
+    # pass min_score=0.0 so the cross-encoder sees the full candidate set instead
+    # of a set already thinned by a coarse cosine cutoff.
+    if min_score is None:
+        min_score = settings.MIN_SIMILARITY_SCORE
     qv     = get_query_embedding(query)
     filt   = {"owner_id": {"$eq": user_id}} if user_id is not None else None
     result = index.query(vector=qv, top_k=top_k,
                          include_metadata=True, filter=filt)
     chunks = []
     for m in result.matches:
-        if m.score >= settings.MIN_SIMILARITY_SCORE:
+        if m.score >= min_score:
             chunks.append({
                 "score":    round(m.score, 4),
                 "text":     m.metadata.get("text", ""),

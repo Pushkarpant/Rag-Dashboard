@@ -1,0 +1,16 @@
+# Dependencies for the RAG evaluation harness (eval/evaluate_rag.py).
+# Installed in CI on top of a clean environment — intentionally slim: it only
+# pulls what the pipeline imports at eval time (no torch/transformers).
+
+# App runtime pieces the eval imports (retrieval + rerank + generation)
+google-generativeai==0.8.6
+pinecone==9.1.0
+cohere==7.0.5
+python-dotenv==1.2.2
+
+# Ragas evaluation stack (pinned to the 0.2 API this script targets)
+ragas>=0.2,<0.3
+langchain-google-genai>=2,<3   # judge EMBEDDINGS (Answer Relevancy) stay on Gemini
+langchain-openai>=0.2           # judge LLM → Groq via OpenAI-compatible endpoint
+datasets>=2.19
+pandas>=2.0

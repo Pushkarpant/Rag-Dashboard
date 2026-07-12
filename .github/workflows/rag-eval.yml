@@ -1,0 +1,62 @@
+name: RAG Evaluation
+
+# Runs the Ragas regression suite on every Pull Request. The job fails (blocking
+# the PR) if any metric drops below its threshold in eval/evaluate_rag.py.
+on:
+  pull_request:
+    branches: [ main ]
+    # Skip PRs that don't touch the pipeline, the eval set, or this workflow.
+    paths:
+      - "backend/**"
+      - "eval/**"
+      - ".github/workflows/rag-eval.yml"
+  workflow_dispatch:   # allow manual runs from the Actions tab
+
+# One eval run per PR; cancel superseded runs to save quota.
+concurrency:
+  group: rag-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ragas-eval:
+    name: Ragas metrics
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install eval dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r eval/requirements.txt
+
+      - name: Run RAG evaluation
+        env:
+          # Generation + the Ragas judge LLM run on Groq (OpenAI-compatible).
+          # GROQ_API_KEY is REQUIRED now: build_judge() drives ChatOpenAI on Groq,
+          # so without it the scoring step fails. GROQ_JUDGE_MODEL/GROQ_BASE_URL
+          # have safe defaults in config.py and only need overriding as secrets.
+          GROQ_API_KEY:        ${{ secrets.GROQ_API_KEY }}
+          # Embeddings (app + Ragas judge) stay on Gemini. langchain-google-genai
+          # reads GOOGLE_API_KEY; mirror the Gemini key into both.
+          GEMINI_API_KEY:      ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY:      ${{ secrets.GEMINI_API_KEY }}
+          PINECONE_API_KEY:    ${{ secrets.PINECONE_API_KEY }}
+          PINECONE_INDEX_NAME: ${{ secrets.PINECONE_INDEX_NAME }}
+          COHERE_API_KEY:      ${{ secrets.COHERE_API_KEY }}
+        run: python eval/evaluate_rag.py
+
+      - name: Upload per-sample results
+        if: always()   # keep the CSV even when the gate fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: ragas-results
+          path: eval/results.csv
+          if-no-files-found: warn
