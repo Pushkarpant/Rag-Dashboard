@@ -119,7 +119,11 @@ def main() -> int:
 
     # Throttle the judge: 1 worker + long retry backoff so free-tier Gemini
     # rate limits don't leave NaN scores like the interrupted run did.
-    run_config = RunConfig(max_workers=1, timeout=180, max_retries=10, max_wait=90)
+    # Faithfulness is the slow metric — it makes SEVERAL sequential judge calls
+    # per answer (claim extraction → per-claim verification), so a single job can
+    # run for minutes on the 8B Groq judge. 180s wasn't enough (Job[4] timed out →
+    # NaN); 600s gives each chain room to finish.
+    run_config = RunConfig(max_workers=1, timeout=600, max_retries=10, max_wait=90)
 
     print("▶ Scoring with Ragas (throttled: max_workers=1)…")
     result = evaluate(dataset=dataset, metrics=metrics, llm=llm,

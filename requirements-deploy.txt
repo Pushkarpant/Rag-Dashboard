@@ -1,4 +1,4 @@
-# Production runtime dependencies for the Verity backend (Fly.io image).
+# Production runtime dependencies for the Verity backend (container image).
 #
 # This is a DELIBERATELY SLIM subset of requirements.txt. The full file pins
 # torch / transformers / sentence-transformers / scikit-learn / scipy (~3 GB),

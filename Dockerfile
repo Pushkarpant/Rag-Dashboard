@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# Verity — single-image build for Fly.io.
+# Verity — single-image build (works on any Docker host: Render, Railway, a VPS…).
 # Stage 1 builds the React/Vite SPA. Stage 2 runs the FastAPI backend and serves
 # that build from backend/static, so the whole app is ONE origin / ONE container.
 
@@ -41,9 +41,9 @@ COPY backend/ ./backend/
 # Drop the compiled SPA where main.py looks for it (backend/static).
 COPY --from=frontend /app/frontend/dist ./backend/static
 
-# Fly routes public traffic to this internal port (see fly.toml).
+# The app listens on this port; map/route your host's public traffic to it.
 EXPOSE 8080
 
 # One worker: the app holds module-level clients (Pinecone, Groq) and does
-# blocking work off-thread; scale out with Fly machines, not in-process workers.
+# blocking work off-thread; scale out with more containers, not in-process workers.
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]

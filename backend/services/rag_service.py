@@ -40,7 +40,11 @@ def generate_answer(question: str, context: str) -> str:
 RULES:
 1. Use ONLY information from the DOCUMENT CONTEXT
 2. If the answer is not in the documents say: "This information is not found in the uploaded documents."
-3. Cite document name and page for each fact
+3. State each fact directly. Do NOT wrap facts in citation phrases like "as
+   stated in SOURCE 1" or "this is also confirmed in SOURCE 2", and do NOT make
+   claims ABOUT the sources — those cannot be verified against the text and read
+   as filler. Instead, end the whole answer with ONE line:
+   "Source: <document name>, Page <n>".
 4. Be specific — use exact numbers, names, dates when present
 5. Structure clearly with paragraphs
 

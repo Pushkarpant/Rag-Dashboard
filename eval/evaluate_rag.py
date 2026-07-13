@@ -163,7 +163,7 @@ def main() -> int:
     # so under parallel load on the Groq endpoint those chains blow past the
     # timeout and every faithfulness job dies → NaN. Few workers + a long timeout
     # + retries let each chain finish. (Same config rescore.py uses.)
-    run_config = RunConfig(max_workers=2, timeout=300, max_retries=10, max_wait=90)
+    run_config = RunConfig(max_workers=2, timeout=600, max_retries=10, max_wait=90)
 
     print("▶ Scoring with Ragas (Faithfulness, Answer Relevancy, "
           "Context Precision, Context Recall)…")
