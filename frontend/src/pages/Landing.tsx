@@ -162,7 +162,7 @@ export default function Landing() {
 
             <p style={{ color: "var(--text-dim)", fontSize: 12, marginTop: 18,
               animation: "fadeUp .6s .4s ease both" }}>
-              No credit card required · Free-tier friendly · First signup becomes admin
+              No credit card required · Free-tier friendly 
             </p>
           </div>
         </section>
