@@ -8,7 +8,8 @@ for _stream in (sys.stdout, sys.stderr):
     except Exception:
         pass
 
-import os, time, json, asyncio
+import os, time, json, asyncio, math
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -63,6 +64,34 @@ async def ask(req: QuestionRequest,
               user: User  = Depends(get_current_user)):
     if not req.question.strip():
         raise HTTPException(400, "Question cannot be empty")
+
+    # ── Per-user rate limit: ASK_LIMIT questions per rolling ASK_WINDOW_HOURS ──
+    # Count how many questions this user has asked inside the window. We use the
+    # existing Query.created_at rows as the source of truth (no extra table), so
+    # the window is genuinely rolling — the oldest question "falls off" as time
+    # passes rather than resetting on a fixed clock. Admins are exempt.
+    if settings.ASK_LIMIT > 0 and user.role != "admin":
+        window_start = datetime.utcnow() - timedelta(hours=settings.ASK_WINDOW_HOURS)
+        recent = (db.query(Query)
+                    .filter(Query.user_id == user.id,
+                            Query.created_at >= window_start)
+                    .order_by(Query.created_at.asc())
+                    .all())
+        if len(recent) >= settings.ASK_LIMIT:
+            # The limit clears when the OLDEST question in the window expires.
+            resets_at   = recent[0].created_at + timedelta(hours=settings.ASK_WINDOW_HOURS)
+            mins_left   = max(1, math.ceil((resets_at - datetime.utcnow()).total_seconds() / 60))
+            hrs, mins   = divmod(mins_left, 60)
+            wait_str    = f"{hrs}h {mins}m" if hrs else f"{mins}m"
+            raise HTTPException(
+                status_code=429,
+                detail=(f"Message limit reached — you've used all "
+                        f"{settings.ASK_LIMIT} questions for the last "
+                        f"{settings.ASK_WINDOW_HOURS} hours. You can continue in "
+                        f"{wait_str}."),
+                headers={"Retry-After": str(mins_left * 60)},
+            )
+
     start = time.time()
     try:
         result = answer_question(question=req.question,

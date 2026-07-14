@@ -50,6 +50,12 @@ class Settings:
     # — a healthy rerank of ~50 chunks still returns in ~1-2s.
     RERANK_TIMEOUT_S:      float = 15.0   # per-call timeout for the Cohere API
 
+    # Per-user question rate limit: at most ASK_LIMIT questions per rolling
+    # ASK_WINDOW_HOURS window. Enforced in /ask by counting the user's Query rows
+    # in that window. Set ASK_LIMIT=0 to disable the limit entirely.
+    ASK_LIMIT:             int   = int(os.getenv("ASK_LIMIT", "10"))
+    ASK_WINDOW_HOURS:      int   = int(os.getenv("ASK_WINDOW_HOURS", "12"))
+
     DEFAULT_TOP_K:         int   = 7
     MIN_SIMILARITY_SCORE:  float = 0.30
     CHUNK_SIZE:            int   = 1000

@@ -91,3 +91,7 @@ export const getAdminUsers     = async () => (await api.get("/admin/users")).dat
 export const getAdminQueries   = async (l=50) => (await api.get(`/admin/queries?limit=${l}`)).data as AdminQueryRow[];
 export const getAdminDocuments = async () => (await api.get("/admin/documents")).data as AdminDocumentRow[];
 export const getAdminActivity  = async () => (await api.get("/admin/activity-timeline")).data    as ActivityPoint[];
+
+// Admin destructive actions: delete any user's document, or a whole user account.
+export const deleteAdminDocument = async (id:number) => (await api.delete(`/admin/documents/${id}`)).data as { deleted:string; id:number };
+export const deleteAdminUser     = async (id:number) => (await api.delete(`/admin/users/${id}`)).data     as { deleted_user:string; id:number };

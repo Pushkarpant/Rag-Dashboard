@@ -2,7 +2,7 @@
 import { useState, useEffect, CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { getAdminStats, getAdminUsers, getAdminQueries, getAdminDocuments, getAdminActivity } from "../services/api";
+import { getAdminStats, getAdminUsers, getAdminQueries, getAdminDocuments, getAdminActivity, deleteAdminDocument, deleteAdminUser } from "../services/api";
 import { AdminStats, AdminUserRow, AdminQueryRow, AdminDocumentRow, ActivityPoint } from "../types";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { useCountUp } from "../hooks/useCountUp";
@@ -34,6 +34,21 @@ function Badge({ text, color }: { text: string; color: string }) {
   return <span style={{ background: color + "18", color, borderRadius: 20, padding: "3px 10px", fontSize: 11, fontWeight: 700 }}>{text}</span>;
 }
 
+// Small red destructive action button used in the admin tables.
+function DeleteBtn({ onClick, busy, disabled, title }: { onClick: () => void; busy?: boolean; disabled?: boolean; title?: string }) {
+  const off = busy || disabled;
+  return (
+    <button onClick={onClick} disabled={off} title={title || "Delete"}
+      style={{ background: off ? "transparent" : "#e0685614", border: "1px solid " + (off ? "var(--border)" : "#e0685655"),
+        borderRadius: 7, padding: "5px 11px", color: off ? "var(--text-dim)" : "#e06856", fontSize: 12, fontWeight: 600,
+        cursor: off ? "not-allowed" : "pointer", opacity: disabled ? 0.5 : 1, transition: "all .15s", whiteSpace: "nowrap" }}
+      onMouseEnter={e => { if (off) return; const b = e.currentTarget; b.style.background = "#e06856"; b.style.color = "#fff"; }}
+      onMouseLeave={e => { if (off) return; const b = e.currentTarget; b.style.background = "#e0685614"; b.style.color = "#e06856"; }}>
+      {busy ? "Deleting…" : "🗑 Delete"}
+    </button>
+  );
+}
+
 function timeAgo(iso: string) {
   const d = Date.now() - new Date(iso).getTime();
   const m = Math.floor(d / 60000);
@@ -61,10 +76,77 @@ export default function AdminPanel() {
   const [activity, setActivity] = useState<ActivityPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState<string | null>(null);   // e.g. "doc:3" / "user:5" while its delete is in flight
+  // In-app confirmation dialog (replaces the native window.confirm browser popup).
+  const [confirmData, setConfirmData] = useState<null | { id: string; title: string; message: string; run: () => Promise<void> }>(null);
+  // Lightweight toast notification (success / error), auto-dismisses.
+  const [toast, setToast] = useState<null | { msg: string; type: "ok" | "err" }>(null);
+  const notify = (msg: string, type: "ok" | "err") => {
+    setToast({ msg, type });
+    window.setTimeout(() => setToast(null), 3600);
+  };
+
+  // Run the pending confirmed action with busy state + toast feedback.
+  const runConfirmed = async () => {
+    if (!confirmData) return;
+    setBusyId(confirmData.id); setError("");
+    try {
+      await confirmData.run();     // DELETE request + optimistic removal + success toast
+    } catch (e: any) {
+      console.error("Admin delete failed:", e);
+      const msg = e.response?.data?.detail || e.message || "Action failed";
+      setError(msg); notify(msg, "err");
+    } finally {
+      setBusyId(null); setConfirmData(null);
+    }
+    // Reconcile against the server so the table always matches the real DB.
+    // If a delete silently didn't persist, the row reappears here (best-effort).
+    try { await loadAll(); } catch { /* keep optimistic state if refetch fails */ }
+  };
+
+  // Delete any user's document: removes Pinecone vectors + file + row server-side,
+  // then drops it from local state and decrements the KPI counts.
+  const handleDeleteDoc = (d: AdminDocumentRow) => setConfirmData({
+    id: `doc:${d.id}`,
+    title: "Delete document?",
+    message: `"${d.filename}" (owner: ${d.owner_email}) will be permanently removed, including its vectors. This cannot be undone.`,
+    run: async () => {
+      await deleteAdminDocument(d.id);
+      setDocs(prev => prev.filter(x => x.id !== d.id));
+      setUsers(prev => prev.map(u => u.email === d.owner_email ? { ...u, documents: Math.max(0, u.documents - 1) } : u));
+      setStats(prev => prev ? { ...prev, total_documents: Math.max(0, prev.total_documents - 1), total_chunks: Math.max(0, prev.total_chunks - d.chunks_count) } : prev);
+      notify(`Deleted "${d.filename}"`, "ok");
+    },
+  });
+
+  // Delete a whole user + all their data. Guarded against deleting yourself.
+  const handleDeleteUser = (u: AdminUserRow) => {
+    if (u.id === user?.id) { notify("You cannot delete your own admin account.", "err"); return; }
+    setConfirmData({
+      id: `user:${u.id}`,
+      title: "Delete user?",
+      message: `"${u.email}" and ALL their documents, chats, and questions will be permanently removed. This cannot be undone.`,
+      run: async () => {
+        await deleteAdminUser(u.id);
+        setUsers(prev => prev.filter(x => x.id !== u.id));
+        setDocs(prev => prev.filter(x => x.owner_email !== u.email));   // their docs disappear from the docs tab too
+        setStats(prev => prev ? { ...prev, total_users: Math.max(0, prev.total_users - 1) } : prev);
+        notify(`Deleted user "${u.email}"`, "ok");
+      },
+    });
+  };
+
+  // Load everything from the server. Reused on mount AND after a delete, so the
+  // UI is always reconciled against the real DB (not just optimistic local edits).
+  const loadAll = async () => {
+    const [s, u, q, d, a] = await Promise.all([
+      getAdminStats(), getAdminUsers(), getAdminQueries(50), getAdminDocuments(), getAdminActivity(),
+    ]);
+    setStats(s); setUsers(u); setQueries(q); setDocs(d); setActivity(a);
+  };
 
   useEffect(() => {
-    Promise.all([getAdminStats(), getAdminUsers(), getAdminQueries(50), getAdminDocuments(), getAdminActivity()])
-      .then(([s, u, q, d, a]) => { setStats(s); setUsers(u); setQueries(q); setDocs(d); setActivity(a); })
+    loadAll()
       .catch(e => setError(e.response?.data?.detail || "Failed to load"))
       .finally(() => setLoading(false));
   }, []);
@@ -77,6 +159,46 @@ export default function AdminPanel() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--bg)", fontFamily: "'Inter',sans-serif", color: "var(--text)" }}>
+
+      {/* Toast notification (in-app, replaces browser alerts) */}
+      {toast && (
+        <div style={{
+          position: "fixed", top: 18, left: "50%", transform: "translateX(-50%)", zIndex: 100,
+          background: "var(--surface)", border: "1px solid " + (toast.type === "ok" ? "#54c75066" : "#e0685666"),
+          borderLeft: "3px solid " + (toast.type === "ok" ? "#54c750" : "#e06856"),
+          borderRadius: 10, padding: "12px 18px", minWidth: 260, maxWidth: 440,
+          boxShadow: "0 12px 40px rgba(0,0,0,.35)", display: "flex", alignItems: "center", gap: 10,
+          fontSize: 13, color: "var(--text)",
+        }} className="fade-up">
+          <span style={{ fontSize: 15 }}>{toast.type === "ok" ? "✅" : "⚠️"}</span>
+          <span>{toast.msg}</span>
+        </div>
+      )}
+
+      {/* In-app confirmation modal (replaces window.confirm) */}
+      {confirmData && (
+        <div onClick={() => busyId ? null : setConfirmData(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 90, background: "rgba(0,0,0,.55)",
+            backdropFilter: "blur(2px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} className="fade-up"
+            style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 16,
+              padding: "24px 24px 20px", width: "100%", maxWidth: 420, boxShadow: "0 24px 70px rgba(0,0,0,.5)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: "#e0685618", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 }}>🗑</div>
+              <div style={{ fontSize: 17, fontWeight: 700 }}>{confirmData.title}</div>
+            </div>
+            <div style={{ color: "var(--text-muted)", fontSize: 13, lineHeight: 1.55, marginBottom: 22 }}>{confirmData.message}</div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button onClick={() => setConfirmData(null)} disabled={!!busyId}
+                style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: 9, padding: "9px 18px", color: "var(--text-muted)", fontSize: 13, fontWeight: 600, cursor: busyId ? "not-allowed" : "pointer" }}>
+                Cancel</button>
+              <button onClick={runConfirmed} disabled={!!busyId}
+                style={{ background: busyId ? "#e0685699" : "#e06856", border: "none", borderRadius: 9, padding: "9px 20px", color: "#fff", fontSize: 13, fontWeight: 700, cursor: busyId ? "wait" : "pointer" }}>
+                {busyId ? "Deleting…" : "Delete"}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top bar */}
       <div style={{ padding: "13px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg)", position: "sticky", top: 0, zIndex: 30 }}>
@@ -220,7 +342,7 @@ export default function AdminPanel() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead><tr>
                     <th style={thS}>Name</th><th style={thS}>Email</th><th style={thS}>Role</th>
-                    <th style={thS}>Docs</th><th style={thS}>Queries</th><th style={thS}>Joined</th>
+                    <th style={thS}>Docs</th><th style={thS}>Queries</th><th style={thS}>Joined</th><th style={thS}>Actions</th>
                   </tr></thead>
                   <tbody>
                     {users.map(u => (
@@ -231,6 +353,11 @@ export default function AdminPanel() {
                         <td style={tdS}>{u.documents}</td>
                         <td style={tdS}>{u.queries}</td>
                         <td style={{ ...tdS, color: "var(--text-dim)" }}>{timeAgo(u.created_at)}</td>
+                        <td style={tdS}>
+                          <DeleteBtn onClick={() => handleDeleteUser(u)} busy={busyId === `user:${u.id}`}
+                            disabled={u.id === user?.id}
+                            title={u.id === user?.id ? "You can't delete your own account" : `Delete ${u.email}`} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -271,7 +398,7 @@ export default function AdminPanel() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead><tr>
                     <th style={thS}>Filename</th><th style={thS}>Owner</th>
-                    <th style={thS}>Chunks</th><th style={thS}>Uploaded</th>
+                    <th style={thS}>Chunks</th><th style={thS}>Uploaded</th><th style={thS}>Actions</th>
                   </tr></thead>
                   <tbody>
                     {docs.map(d => (
@@ -280,6 +407,10 @@ export default function AdminPanel() {
                         <td style={tdS}>{d.owner_email}</td>
                         <td style={tdS}>{d.chunks_count}</td>
                         <td style={{ ...tdS, color: "var(--text-dim)" }}>{timeAgo(d.uploaded_at)}</td>
+                        <td style={tdS}>
+                          <DeleteBtn onClick={() => handleDeleteDoc(d)} busy={busyId === `doc:${d.id}`}
+                            title={`Delete ${d.filename}`} />
+                        </td>
                       </tr>
                     ))}
                   </tbody>

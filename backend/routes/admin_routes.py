@@ -1,12 +1,32 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
+import os
 from backend.database import get_db
 from backend.models import User, Document, Query
 from backend.auth import get_current_admin
+from backend.services.vector_store import delete_document_chunks
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+DOCS_FOLDER = "documents"
+
+
+def _purge_document(db: Session, doc: Document) -> None:
+    """Fully remove one document: Pinecone vectors, the file on disk, and the DB
+    row. Shared by admin document-delete and admin user-delete so a deleted
+    user leaves no orphaned vectors behind (Postgres cascade drops the rows, but
+    Pinecone is a separate store and won't cascade)."""
+    # Vectors are scoped by (filename, owner_id) — the same key the upload used.
+    delete_document_chunks(doc.filename, doc.owner_id)
+    fp = os.path.join(DOCS_FOLDER, str(doc.owner_id), doc.filename)
+    if os.path.exists(fp):
+        try:
+            os.remove(fp)
+        except OSError:
+            pass  # best-effort; disk file is ephemeral anyway
+    db.delete(doc)
 
 @router.get("/stats")
 def admin_stats(db: Session = Depends(get_db), _: User = Depends(get_current_admin)):
@@ -51,3 +71,48 @@ def admin_activity(db: Session = Depends(get_db), _: User = Depends(get_current_
                  func.date(Query.created_at) == (datetime.utcnow() - timedelta(days=i)).date()
              ).count()}
             for i in range(13, -1, -1)]
+
+
+@router.delete("/documents/{doc_id}")
+def admin_delete_document(doc_id: int,
+                          db: Session = Depends(get_db),
+                          _: User = Depends(get_current_admin)):
+    """Admin: delete ANY user's document (vectors + file + row)."""
+    doc = db.query(Document).filter(Document.id == doc_id).first()
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    filename = doc.filename
+    _purge_document(db, doc)
+    db.commit()
+    return {"deleted": filename, "id": doc_id}
+
+
+@router.delete("/users/{user_id}")
+def admin_delete_user(user_id: int,
+                      db: Session = Depends(get_db),
+                      admin: User = Depends(get_current_admin)):
+    """Admin: delete ANY user and ALL their data — documents (incl. Pinecone
+    vectors + disk files), queries, and conversations. Postgres cascades the
+    child rows once the User is deleted; we purge Pinecone/disk first because
+    those live outside the database and won't cascade."""
+    if user_id == admin.id:
+        raise HTTPException(400, "You cannot delete your own admin account.")
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+
+    # Purge external (Pinecone + disk) state for each of the user's documents.
+    # We only need vector/file cleanup here; the DB rows go via cascade on delete.
+    for doc in db.query(Document).filter(Document.owner_id == user_id).all():
+        delete_document_chunks(doc.filename, doc.owner_id)
+        fp = os.path.join(DOCS_FOLDER, str(doc.owner_id), doc.filename)
+        if os.path.exists(fp):
+            try:
+                os.remove(fp)
+            except OSError:
+                pass
+
+    email = target.email
+    db.delete(target)   # cascade removes documents, queries, conversations
+    db.commit()
+    return {"deleted_user": email, "id": user_id}
