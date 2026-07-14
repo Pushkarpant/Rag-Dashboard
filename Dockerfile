@@ -41,9 +41,13 @@ COPY backend/ ./backend/
 # Drop the compiled SPA where main.py looks for it (backend/static).
 COPY --from=frontend /app/frontend/dist ./backend/static
 
-# The app listens on this port; map/route your host's public traffic to it.
+# Default port for local `docker run`. In production the host (Render, Railway…)
+# injects its own $PORT, which the CMD below honours.
+ENV PORT=8080
 EXPOSE 8080
 
+# Bind to $PORT so managed hosts that assign a dynamic port (Render) route traffic
+# correctly; falls back to 8080 locally. Shell form so ${PORT} is expanded.
 # One worker: the app holds module-level clients (Pinecone, Groq) and does
 # blocking work off-thread; scale out with more containers, not in-process workers.
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8080}

@@ -1,0 +1,50 @@
+# render.yaml — Render Blueprint for Verity
+#
+# One file that provisions BOTH the web service (Docker) and a managed
+# PostgreSQL, and wires the DB connection string into the app automatically.
+# In the Render dashboard: New → Blueprint → point at this repo.
+#
+# Secrets are marked `sync: false` — Render will PROMPT you for their values on
+# first deploy (they are never committed to the repo). DATABASE_URL is injected
+# automatically from the database below, so you never paste it by hand.
+
+databases:
+  - name: verity-db
+    databaseName: rag_dashboard
+    user: rag_user
+    plan: free                 # free Postgres (expires after 90 days — upgrade for prod)
+
+services:
+  - type: web
+    name: verity
+    runtime: docker
+    plan: free                 # free web service (sleeps after 15 min idle; cold start ~30s)
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz  # lightweight liveness route in backend/main.py
+    autoDeploy: true           # redeploy on every push to the tracked branch
+    envVars:
+      # Injected from the managed database above — no manual entry.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: verity-db
+          property: connectionString
+      # Non-secret config.
+      - key: PINECONE_INDEX_NAME
+        value: rag-documents
+      # Secrets — Render prompts for these on first deploy (sync: false).
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: COHERE_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true    # Render generates a strong random secret for you
+      # Optional tuning (defaults live in backend/config.py).
+      - key: ASK_LIMIT
+        value: "10"
+      - key: ASK_WINDOW_HOURS
+        value: "12"

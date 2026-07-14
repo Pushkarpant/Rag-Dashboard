@@ -51,7 +51,10 @@ Every team sits on thousands of internal documents — reports, compliance paper
 | 🗂️ **Chat history** | Conversations are saved, auto-titled, and resumable from the sidebar |
 | 💡 **Smart follow-ups** | Each answer suggests 3 relevant next questions |
 | 📊 **Admin analytics** | Users, queries, confidence distribution, latency & 14-day activity timeline |
+| 🛡️ **Admin management** | Admins can delete any user (with all their data) or any document — vectors, files & rows |
+| ⏱️ **Per-user rate limiting** | Configurable quota (default **10 questions / 12 h**), enforced on `/ask` with a rolling window |
 | 🧪 **Automated RAG eval** | Ragas metrics gate every Pull Request in CI |
+| 🐳 **One-click deploy** | Single-container Docker image + Render Blueprint — API and SPA served from one origin |
 | 🎨 **Polished UI** | Dark/light themes, aurora backgrounds, animated micro-interactions |
 
 ---
@@ -201,11 +204,11 @@ JWT_SECRET=<64-char hex — python -c "import secrets; print(secrets.token_hex(3
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET`    | `/`                        | Health check |
+| `GET`    | `/healthz`                 | Health check (liveness) |
 | `POST`   | `/auth/signup`             | Create account (first user = admin) |
 | `POST`   | `/auth/login`              | Log in, returns JWT |
 | `GET`    | `/auth/me`                 | Current user |
-| `POST`   | `/ask`                     | Ask a question 🔒 |
+| `POST`   | `/ask`                     | Ask a question 🔒 · returns **429** past the rate limit |
 | `POST`   | `/documents/upload`        | Upload a document — **SSE** progress 🔒 |
 | `GET`    | `/documents`               | List your documents 🔒 |
 | `DELETE` | `/documents/{filename}`    | Delete a document + its vectors 🔒 |
@@ -213,6 +216,8 @@ JWT_SECRET=<64-char hex — python -c "import secrets; print(secrets.token_hex(3
 | `GET`    | `/conversations`           | List / create / delete chats 🔒 |
 | `GET`    | `/conversations/{id}/messages` | Full message history 🔒 |
 | `GET`    | `/admin/*`                 | Platform analytics 👑 admin only |
+| `DELETE` | `/admin/documents/{id}`    | Delete **any** user's document 👑 |
+| `DELETE` | `/admin/users/{id}`        | Delete **any** user + all their data 👑 |
 
 🔒 = requires `Authorization: Bearer <token>` · 👑 = admin role
 
@@ -277,7 +282,9 @@ verity/
 ├── eval/                          # Ragas harness · golden set · test corpus
 ├── alembic/                       # Database migrations
 ├── .github/workflows/rag-eval.yml # CI quality gate
-├── requirements.txt
+├── Dockerfile · render.yaml       # Single-container build + Render Blueprint
+├── requirements.txt               # Full dev deps  (requirements-deploy.txt = slim prod)
+├── deploy.md                      # Render deployment roadmap
 └── .env
 ```
 
@@ -290,6 +297,33 @@ verity/
 **Why rerank?** Vector (bi-encoder) search is fast but only *approximately* relevant. A cross-encoder reranker reads the query and each candidate chunk together, catching relevance a pure embedding distance misses — dramatically improving what the LLM actually sees.
 
 **Why a confidence score?** An answer you can't trust is worse than no answer. Verity derives confidence from retrieval signal (best + average similarity, source coverage) so users know when to double-check.
+
+---
+
+## 🚢 Deployment
+
+Verity ships as a **single Docker image**: a multi-stage build compiles the React
+SPA and hands it to FastAPI, which serves both the API and the UI from **one
+origin** — no CORS, one service to run. The production image uses a slim
+dependency set (`requirements-deploy.txt`), dropping ~3 GB of ML libraries that
+aren't needed at runtime.
+
+```bash
+# Build & run the whole app locally in one container
+docker build -t verity .
+docker run -p 8080:8080 --env-file .env verity   # → http://localhost:8080
+```
+
+**Deploy to the cloud (Render):** a `render.yaml` Blueprint provisions the web
+service **and** a managed PostgreSQL and wires them together — connect the repo,
+paste four API keys, and you're live. Full step-by-step in **[`deploy.md`](deploy.md)**.
+
+| File | Role |
+|---|---|
+| `Dockerfile` | Multi-stage build (Node → Python), serves API + SPA, binds `$PORT` |
+| `render.yaml` | Render Blueprint: web service + PostgreSQL + env wiring |
+| `requirements-deploy.txt` | Slim production dependencies |
+| `deploy.md` | Full Render deployment roadmap |
 
 ---
 
