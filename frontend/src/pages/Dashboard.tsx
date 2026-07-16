@@ -739,7 +739,10 @@ export default function Dashboard() {
                 flexShrink:0, transition:"all .2s" }}
               onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.background="#e06856"; b.style.color="#fff"; b.style.borderColor="#e06856"; }}
               onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.background="#e0685614"; b.style.color="#e06856"; b.style.borderColor="#e0685655"; }}>
-              <span style={{ fontSize:14, lineHeight:1 }}>⏻</span>{!isMobile && " Logout"}
+              {/* Inline SVG power icon — the ⏻ glyph renders as a tofu box on fonts that lack it */}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" style={{ flexShrink:0 }}>
+                <path d="M12 2v10" /><path d="M18.4 6.6a9 9 0 1 1-12.8 0" />
+              </svg>{!isMobile && " Logout"}
             </button>
           </div>
         </div>
