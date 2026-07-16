@@ -57,7 +57,7 @@ export default function Signup() {
   };
 
   return (
-    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center",
+    <div className="auth-shell" style={{ minHeight:"100vh", display:"flex", alignItems:"center",
       justifyContent:"center", background:"var(--bg)", position:"relative",
       overflow:"hidden", fontFamily:"'Inter',sans-serif" }}>
 
@@ -138,13 +138,7 @@ export default function Signup() {
             {loading ? "Creating account…" : "Create Account →"}
           </button>
 
-          <div style={{ marginTop:16, padding:"9px 12px",
-            background:"#54c75010", border:"1px solid #54c75020",
-            borderRadius:8, color:"var(--text-dim)", fontSize:11,
-            textAlign:"center", lineHeight:1.5 }}>
-            💡 The <strong style={{ color:"var(--text-muted)" }}>first</strong> signup
-            automatically becomes admin
-          </div>
+         
         </form>
 
         <p style={{ textAlign:"center", color:"var(--text-dim)",

@@ -201,27 +201,31 @@ export default function AdminPanel() {
       )}
 
       {/* Top bar */}
-      <div style={{ padding: "13px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg)", position: "sticky", top: 0, zIndex: 30 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <Link to="/dashboard" style={{ color: "var(--text-dim)", fontSize: 12, textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}>← Dashboard</Link>
-          <div style={{ width: 1, height: 18, background: "var(--border)" }} />
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 7, background: "var(--grad)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, boxShadow: "0 0 12px #54c75055" }}>⚙</div>
-            <span style={{ fontWeight: 700, fontSize: 15 }}>Admin Panel</span>
+      <div className="admin-topbar" style={{ padding: "13px 24px", borderBottom: "1px solid var(--border)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--bg)", position: "sticky", top: 0, zIndex: 30, gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+          <Link to="/dashboard" className="admin-back" title="Back to dashboard"
+            style={{ color: "var(--text-dim)", fontSize: 12, textDecoration: "none", display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap", flexShrink: 0 }}>
+            <span style={{ fontSize: 14, lineHeight: 1 }}>←</span>
+            <span className="admin-back-label"> Dashboard</span>
+          </Link>
+          <div className="hide-mobile" style={{ width: 1, height: 18, background: "var(--border)", flexShrink: 0 }} />
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 7, background: "var(--grad)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, boxShadow: "0 0 12px #54c75055", flexShrink: 0 }}>⚙</div>
+            <span style={{ fontWeight: 700, fontSize: 15, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>Admin Panel</span>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ color: "var(--text-dim)", fontSize: 12 }}>{user?.email}</div>
-          <div style={{ background: "#54c75022", color: "#54c750", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700 }}>ADMIN</div>
-          <button onClick={() => { logout(); navigate("/"); }} title="Log out"
-            style={{ background: "#e0685614", border: "1px solid #e0685655", borderRadius: 8, padding: "6px 13px", color: "#e06856", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, transition: "all .2s" }}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, flexShrink: 0 }}>
+          <div className="hide-mobile" style={{ color: "var(--text-dim)", fontSize: 12, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user?.email}</div>
+          <div className="hide-mobile" style={{ background: "#54c75022", color: "#54c750", borderRadius: 20, padding: "2px 10px", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>ADMIN</div>
+          <button onClick={() => { logout(); navigate("/"); }} title="Log out" className="admin-logout"
+            style={{ background: "#e0685614", border: "1px solid #e0685655", borderRadius: 8, padding: "6px 13px", color: "#e06856", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center", gap: 6, transition: "all .2s", flexShrink: 0, whiteSpace: "nowrap" }}
             onMouseEnter={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "#e06856"; b.style.color = "#fff"; b.style.borderColor = "#e06856"; }}
             onMouseLeave={e => { const b = e.currentTarget as HTMLButtonElement; b.style.background = "#e0685614"; b.style.color = "#e06856"; b.style.borderColor = "#e0685655"; }}>
-            <span style={{ fontSize: 14, lineHeight: 1 }}>⏻</span> Logout</button>
+            <span style={{ fontSize: 14, lineHeight: 1 }}>⏻</span><span className="admin-logout-label"> Logout</span></button>
         </div>
       </div>
 
-      <div style={{ padding: "24px", maxWidth: 1280, margin: "0 auto" }}>
+      <div className="admin-content" style={{ padding: "24px", maxWidth: 1280, margin: "0 auto" }}>
         {error && <div style={{ background: "#EF444415", border: "1px solid #EF444430", borderRadius: 10, padding: "12px 16px", marginBottom: 20, color: "#EF4444", fontSize: 13 }}>{error}</div>}
 
         {loading ? (
@@ -292,7 +296,7 @@ export default function AdminPanel() {
             </div>
 
             {/* Tab nav */}
-            <div style={{ display: "flex", gap: 4, marginBottom: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 4, width: "fit-content" }}>
+            <div className="admin-tabs" style={{ display: "flex", gap: 4, marginBottom: 16, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 10, padding: 4, width: "fit-content" }}>
               {(["overview", "users", "queries", "documents"] as Tab[]).map(t => (
                 <button key={t} onClick={() => setTab(t)} className="press" style={{
                   padding: "7px 16px", background: tab === t ? "var(--surface2)" : "transparent",
@@ -338,7 +342,7 @@ export default function AdminPanel() {
 
             {/* Users */}
             {tab === "users" && (
-              <div key="users" className="fade-in" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
+              <div key="users" className="fade-in admin-scroll" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead><tr>
                     <th style={thS}>Name</th><th style={thS}>Email</th><th style={thS}>Role</th>
@@ -368,7 +372,7 @@ export default function AdminPanel() {
 
             {/* Queries */}
             {tab === "queries" && (
-              <div key="queries" className="fade-in" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
+              <div key="queries" className="fade-in admin-scroll" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead><tr>
                     <th style={thS}>Question</th><th style={thS}>User</th>
@@ -394,7 +398,7 @@ export default function AdminPanel() {
 
             {/* Documents */}
             {tab === "documents" && (
-              <div key="documents" className="fade-in" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
+              <div key="documents" className="fade-in admin-scroll" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 14, overflow: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead><tr>
                     <th style={thS}>Filename</th><th style={thS}>Owner</th>

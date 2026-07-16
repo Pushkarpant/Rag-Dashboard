@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- viewport-fit=cover → we can pad with env(safe-area-inset-*) on notched phones;
+         interactive-widget=resizes-content → the Android keyboard RESIZES the page
+         instead of overlaying it, so the chat input is never hidden behind it -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <title>Verity — Ask Your Documents, Verify Every Answer</title>
     <meta name="description" content="Ask questions from your documents using Llama 3.3 70B on Groq and Pinecone vector search" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✦</text></svg>" />

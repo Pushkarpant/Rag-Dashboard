@@ -136,7 +136,7 @@ function MessageBubble({
   return (
     <div className="msg-enter" style={{ marginBottom:28 }}>
       {/* ── Row: avatar + bubble, direction flips for user ── */}
-      <div style={{
+      <div className="msg-row" style={{
         display:"flex",
         flexDirection: isUser ? "row-reverse" : "row",
         alignItems:"flex-start",
@@ -180,7 +180,7 @@ function MessageBubble({
 
       {/* ── AI extras (only on real RAG responses) ── */}
       {isRealResponse && !msg.loading && (
-        <div style={{ marginLeft:44, marginTop:10, maxWidth:"calc(82% - 44px)" }}>
+        <div className="msg-extras" style={{ marginLeft:44, marginTop:10, maxWidth:"calc(82% - 44px)" }}>
 
           {/* Copy button */}
           <button onClick={copy} style={{
@@ -308,7 +308,10 @@ export default function Dashboard() {
   const [input, setInput]     = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Start closed on phones (drawer pattern) — open by default only on desktop
+  const [sidebarOpen, setSidebarOpen] = useState(
+    () => typeof window === "undefined" || window.innerWidth >= 768
+  );
   const [theme, setTheme]             = useState<"dark"|"light">(
     () => (localStorage.getItem("rag_theme") as "dark"|"light") || "dark");
   const [sidebarTab, setSidebarTab]   = useState<"chats"|"docs">("chats");
@@ -329,9 +332,6 @@ export default function Dashboard() {
     localStorage.setItem("rag_theme", theme);
   }, [theme]);
 
-  // Mobile: sidebar closed by default
-  useEffect(() => { if (isMobile) setSidebarOpen(false); }, []);
-
   // Keyboard shortcut
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -346,6 +346,12 @@ export default function Dashboard() {
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages]);
 
+  // Lock the page behind the drawer — otherwise the chat scrolls under the overlay
+  useEffect(() => {
+    document.body.style.overflow = isMobile && sidebarOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [isMobile, sidebarOpen]);
+
   useEffect(() => {
     listConversations().then(setConversations).catch(() => {});
     getDocuments().then(d => setDocuments(d.documents)).catch(() => {});
@@ -353,6 +359,7 @@ export default function Dashboard() {
 
   const loadConversation = async (id: number) => {
     setActiveConvoId(id);
+    if (isMobile) setSidebarOpen(false);   // drawer closes → straight into the chat
     try {
       const msgs = await getMessages(id);
       setMessages(msgs.map(m => ({
@@ -370,6 +377,7 @@ export default function Dashboard() {
       const c = await createConversation();
       setConversations(prev => [c, ...prev]);
       setActiveConvoId(c.id);
+      if (isMobile) setSidebarOpen(false);   // jump straight into the fresh chat
       setMessages([{
         id: uid(), role:"assistant", timestamp: new Date(),
         content: `Hello${user ? `, ${user.full_name.split(" ")[0]}` : ""}! Upload documents and ask anything — I'll find precise answers with sources and confidence scores.`,
@@ -472,7 +480,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div style={{ display:"flex", height:"100vh", background:"var(--bg)", overflow:"hidden", position:"relative" }}>
+    <div className="app-shell" style={{ display:"flex", background:"var(--bg)", overflow:"hidden", position:"relative" }}>
 
       {/* Ambient green texture — same aurora as the landing/home screen */}
       <Aurora variant="indigo" style={{ opacity:.5 }} />
@@ -485,7 +493,7 @@ export default function Dashboard() {
       )}
 
       {/* ── SIDEBAR ── */}
-      <aside style={{
+      <aside className={isMobile ? "mobile-drawer" : undefined} style={{
         width:"var(--sidebar-w)", flexShrink:0,
         background:"var(--surface)", borderRight:"1px solid var(--border)",
         display:"flex", flexDirection:"column",
@@ -513,7 +521,7 @@ export default function Dashboard() {
               <div style={{ color:"var(--text-dim)", fontSize:10 }}>AI Document Intelligence</div>
             </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} title="Hide sidebar"
+          <button onClick={() => setSidebarOpen(false)} title="Hide sidebar" className="drawer-close"
             style={{ background:"transparent", border:"1px solid var(--border)",
               borderRadius:9, width:32, height:32, color:"var(--text-muted)",
               fontSize:18, lineHeight:1, display:"flex", alignItems:"center",
@@ -672,7 +680,7 @@ export default function Dashboard() {
         minWidth:0, position:"relative", zIndex:1 }}>
 
         {/* Header */}
-        <div style={{ padding:"12px 20px", borderBottom:"1px solid var(--border)",
+        <div className="chat-header" style={{ padding:"12px 20px", borderBottom:"1px solid var(--border)",
           display:"flex", justifyContent:"space-between", alignItems:"center",
           background:"var(--bg)", flexShrink:0, gap:10 }}>
           <div style={{ display:"flex", alignItems:"center", gap:10, minWidth:0 }}>
@@ -690,9 +698,9 @@ export default function Dashboard() {
               </button>
             )}
             <div style={{ minWidth:0 }}>
-              <div style={{ fontWeight:700, fontSize:15, overflow:"hidden",
+              <div style={{ fontWeight:700, fontSize: isMobile ? 14 : 15, overflow:"hidden",
                 textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                Document Intelligence
+                {isMobile ? "Verity" : "Document Intelligence"}
               </div>
               <div style={{ color:"var(--text-dim)", fontSize:11 }}>
                 {documents.length} docs · {documents.reduce((s,d) => s+d.chunks, 0)} chunks
@@ -702,12 +710,15 @@ export default function Dashboard() {
 
           <div style={{ display:"flex", gap:8, alignItems:"center", flexShrink:0 }}>
             {user?.role === "admin" && (
-              <Link to="/admin" style={{ background:"#54c75015",
+              <Link to="/admin" title="Admin panel" style={{ background:"#54c75015",
                 border:"1px solid #54c75040", borderRadius:8,
-                padding:"6px 12px", color:"var(--primary)",
-                textDecoration:"none", fontSize:12, fontWeight:600 }}>⚙ Admin</Link>
+                padding: isMobile ? "6px 9px" : "6px 12px", color:"var(--primary)",
+                textDecoration:"none", fontSize:12, fontWeight:600 }}>
+                ⚙{!isMobile && " Admin"}</Link>
             )}
-            <button onClick={exportChat} style={{ background:"transparent",
+            {/* Export + avatar are desktop-only chrome — on a phone they crowd the
+                header and push the logout button off-screen */}
+            <button onClick={exportChat} className="hide-mobile" style={{ background:"transparent",
               border:"1px solid var(--border)", borderRadius:8,
               padding:"6px 12px", color:"var(--text-dim)", fontSize:12 }}
               onMouseEnter={e => { (e.currentTarget as HTMLButtonElement).style.borderColor="var(--primary)"; (e.currentTarget as HTMLButtonElement).style.color="var(--primary)"; }}
@@ -715,7 +726,7 @@ export default function Dashboard() {
               Export
             </button>
             {/* User avatar — shows actual initial, no more hardcoded "P" */}
-            <div title={user?.email} style={{ width:32, height:32, borderRadius:"50%",
+            <div title={user?.email} className="hide-mobile" style={{ width:32, height:32, borderRadius:"50%",
               background:"linear-gradient(135deg,#6fd96b,#3aa336)",
               display:"flex", alignItems:"center", justifyContent:"center",
               fontSize:13, fontWeight:700, color:"white", flexShrink:0, cursor:"default" }}>
@@ -723,18 +734,18 @@ export default function Dashboard() {
             </div>
             <button onClick={() => { logout(); navigate("/"); }} title="Log out"
               style={{ background:"#e0685614", border:"1px solid #e0685655",
-                borderRadius:8, padding:"6px 13px", color:"#e06856", fontSize:12,
+                borderRadius:8, padding: isMobile ? "6px 10px" : "6px 13px", color:"#e06856", fontSize:12,
                 fontWeight:600, display:"flex", alignItems:"center", gap:6,
                 flexShrink:0, transition:"all .2s" }}
               onMouseEnter={e => { const b=e.currentTarget as HTMLButtonElement; b.style.background="#e06856"; b.style.color="#fff"; b.style.borderColor="#e06856"; }}
               onMouseLeave={e => { const b=e.currentTarget as HTMLButtonElement; b.style.background="#e0685614"; b.style.color="#e06856"; b.style.borderColor="#e0685655"; }}>
-              <span style={{ fontSize:14, lineHeight:1 }}>⏻</span> Logout
+              <span style={{ fontSize:14, lineHeight:1 }}>⏻</span>{!isMobile && " Logout"}
             </button>
           </div>
         </div>
 
         {/* Messages — inner wrapper keeps the chat centered at any panel width */}
-        <div style={{ flex:1, overflow:"auto", padding:"24px 28px" }}>
+        <div className="chat-scroll" style={{ flex:1, overflow:"auto", padding:"24px 28px" }}>
          <div style={{ maxWidth:"var(--chat-max)", width:"100%", margin:"0 auto" }}>
 
           {/* Welcome state */}
@@ -764,7 +775,7 @@ export default function Dashboard() {
         </div>
 
         {/* Input — matched centered column */}
-        <div style={{ padding:"14px 20px", borderTop:"1px solid var(--border)",
+        <div className="input-dock" style={{ padding:"14px 20px", borderTop:"1px solid var(--border)",
           background:"var(--bg)", flexShrink:0 }}>
          <div style={{ maxWidth:"var(--chat-max)", width:"100%", margin:"0 auto" }}>
           <div style={{ display:"flex", gap:8, alignItems:"flex-end",

@@ -132,13 +132,75 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
 textarea,input{font-family:inherit;font-size:14px;}
 kbd{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:2px 6px;font-size:11px;color:var(--text-muted);font-family:'JetBrains Mono',monospace;}
 
+/* ── App shell height ─────────────────────────────────────
+   100vh on mobile includes the browser chrome (URL bar), so the input box
+   rendered BELOW the visible screen. 100dvh tracks the *visible* viewport
+   (shrinks when the URL bar / keyboard shows) — input always stays on screen. */
+.app-shell{height:100vh;}
+@supports(height:100dvh){.app-shell{height:100dvh;}}
+
+/* Auth pages: dvh so the centered card tracks the visible viewport, and
+   vertical padding + scroll so it never clips when the keyboard is open */
+.auth-shell{min-height:100vh;padding-top:32px;padding-bottom:32px;overflow-y:auto!important;}
+@supports(min-height:100dvh){.auth-shell{min-height:100dvh;}}
+
 @media(max-width:768px){
-  :root{--sidebar-w:100%;}
+  /* Drawer, not takeover: like the Claude app the sidebar slides over the chat
+     at ~85% width (max 320px), the dimmed chat stays visible behind it */
+  :root{--sidebar-w:min(85vw,320px);}
   .sidebar-overlay{display:block!important;}
   .msg-max-w>div{max-width:94%!important;}
   .input-area{padding:10px 12px!important;}
   .admin-grid{grid-template-columns:1fr!important;}
   .kpi-wrap{flex-wrap:wrap!important;}
+  /* Elevation so the drawer reads as a layer above the dimmed page.
+     height:100% on position:fixed resolves against the layout viewport, which
+     is TALLER than what's visible while the URL bar shows — the theme-toggle
+     footer fell below the screen. 100dvh tracks the visible viewport. */
+  .mobile-drawer{box-shadow:12px 0 40px #00000066;
+    height:100vh!important;height:100dvh!important;
+    padding-top:env(safe-area-inset-top);}
+  /* Hide desktop-only chrome (keyboard hints, secondary header text) */
+  .hide-mobile{display:none!important;}
+  /* Tighter chat gutters — messages get the full width of a phone */
+  .chat-scroll{padding:16px 12px!important;}
+  .chat-header{padding:10px 12px!important;gap:6px!important;}
+  /* Respect notches / home indicator */
+  .input-dock{padding:10px 12px calc(10px + env(safe-area-inset-bottom))!important;}
+  /* Messages use nearly the full phone width (82% left phone-sized gutters) */
+  .msg-row{max-width:96%!important;}
+  .msg-extras{margin-left:0!important;max-width:100%!important;}
+  /* iOS Safari auto-zooms the page when a focused input's font-size < 16px —
+     that zoom is exactly the "everything shifts off-screen" feel. 16px stops it. */
+  textarea,input{font-size:16px!important;}
+
+  /* ── Touch targets ── Apple HIG minimum is 44px; the 32-34px desktop
+     buttons are hard to hit with a thumb */
+  .chat-header button,.chat-header a{min-height:40px;min-width:40px;
+    display:inline-flex!important;align-items:center;justify-content:center;}
+  .input-dock .press{width:42px!important;height:42px!important;}
+  .drawer-close{width:40px!important;height:40px!important;}
+
+  /* ── Landing page ── the fixed nav crammed 4 controls into 32px side
+     padding; buttons squashed and wrapped ("distorted") */
+  .landing-nav{padding:10px 14px!important;}
+  .landing-nav a{padding:8px 12px!important;font-size:12px!important;white-space:nowrap;}
+  .landing-hero{padding-top:108px!important;padding-bottom:56px!important;}
+  .landing-section{margin-bottom:64px!important;}
+
+  /* ── Admin panel ── single-row compact header: back + logout collapse to
+     icon-only 40px squares, email/badge/divider hide, title ellipsizes */
+  .admin-topbar{padding:8px 10px!important;gap:8px!important;}
+  .admin-back{width:40px;height:40px;justify-content:center;
+    border:1px solid var(--border);border-radius:9px;font-size:16px!important;}
+  .admin-back-label{display:none;}
+  .admin-logout{width:40px;height:40px;justify-content:center;padding:0!important;}
+  .admin-logout-label{display:none;}
+  .admin-tabs{width:100%!important;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .admin-tabs button{white-space:nowrap;}
+  .admin-content{padding:14px 12px!important;}
+  .admin-scroll{-webkit-overflow-scrolling:touch;}
+  .admin-scroll table{min-width:560px;}
 }
 
 /* Respect reduced-motion: kill the ambient/looping animations */

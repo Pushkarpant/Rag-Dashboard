@@ -39,7 +39,7 @@ export default function Login() {
   };
 
   return (
-    <div style={{ minHeight:"100vh", display:"flex", alignItems:"center",
+    <div className="auth-shell" style={{ minHeight:"100vh", display:"flex", alignItems:"center",
       justifyContent:"center", background:"var(--bg)", position:"relative",
       overflow:"hidden", fontFamily:"'Inter',sans-serif" }}>
 

@@ -97,28 +97,28 @@ export default function Landing() {
 
       <div style={{ position: "relative", zIndex: 1 }}>
         {/* ── NAV ── */}
-        <nav className="glass" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
+        <nav className="glass landing-nav" style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
           borderBottom: "1px solid var(--border)", padding: "14px 32px",
-          display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: "var(--grad)",
               display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: 16, boxShadow: "0 0 16px #54c75060", animation: "float 4s ease-in-out infinite" }}>✦</div>
             <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: "-.3px" }}>Verity</span>
           </div>
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", minWidth: 0 }}>
             <ThemeToggle />
             <Link to="/login" className="press" style={{ padding: "8px 18px", borderRadius: 8,
               border: "1px solid var(--border)", color: "var(--text-muted)",
-              textDecoration: "none", fontSize: 13, fontWeight: 500 }}>Sign In</Link>
+              textDecoration: "none", fontSize: 13, fontWeight: 500, whiteSpace: "nowrap" }}>Sign In</Link>
             <Link to="/signup" className="press sheen" style={{ padding: "8px 18px", borderRadius: 8,
               background: "var(--grad-btn)", color: "#fff", textDecoration: "none", fontSize: 13,
-              fontWeight: 600, boxShadow: "0 4px 16px #54c75040" }}>Get Started Free</Link>
+              fontWeight: 600, boxShadow: "0 4px 16px #54c75040", whiteSpace: "nowrap" }}>Get Started Free</Link>
           </div>
         </nav>
 
         {/* ── HERO ── */}
-        <section style={{ paddingTop: 150, paddingBottom: 90, textAlign: "center", position: "relative" }}>
+        <section className="landing-hero" style={{ paddingTop: 150, paddingBottom: 90, textAlign: "center", position: "relative" }}>
           <div style={{ maxWidth: 780, margin: "0 auto", padding: "0 24px" }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: 8,
               background: "#54c75018", border: "1px solid #54c75040",
@@ -168,7 +168,7 @@ export default function Landing() {
         </section>
 
         {/* ── MOCK UI PREVIEW ── */}
-        <section style={{ maxWidth: 900, margin: "0 auto 110px", padding: "0 24px" }}>
+        <section className="landing-section" style={{ maxWidth: 900, margin: "0 auto 110px", padding: "0 24px" }}>
           <Reveal>
             <div className="grad-border lift" style={{ background: "var(--surface)", border: "1px solid var(--border)",
               borderRadius: 20, overflow: "hidden",
@@ -215,7 +215,7 @@ export default function Landing() {
         </section>
 
         {/* ── HOW IT WORKS ── */}
-        <section style={{ maxWidth: 860, margin: "0 auto 110px", padding: "0 24px", textAlign: "center" }}>
+        <section className="landing-section" style={{ maxWidth: 860, margin: "0 auto 110px", padding: "0 24px", textAlign: "center" }}>
           <Reveal><h2 style={{ fontSize: 32, fontWeight: 800, marginBottom: 12, letterSpacing: "-0.5px" }}>How it works</h2></Reveal>
           <Reveal delay={80}><p style={{ color: "var(--text-muted)", marginBottom: 56 }}>Three steps from document to insight</p></Reveal>
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap", justifyContent: "center" }}>
@@ -237,7 +237,7 @@ export default function Landing() {
         </section>
 
         {/* ── FEATURES ── */}
-        <section style={{ maxWidth: 960, margin: "0 auto 110px", padding: "0 24px", textAlign: "center" }}>
+        <section className="landing-section" style={{ maxWidth: 960, margin: "0 auto 110px", padding: "0 24px", textAlign: "center" }}>
           <Reveal><h2 style={{ fontSize: 32, fontWeight: 800, marginBottom: 12, letterSpacing: "-0.5px" }}>Everything you need</h2></Reveal>
           <Reveal delay={80}><p style={{ color: "var(--text-muted)", marginBottom: 56 }}>Built for engineers who want the full picture</p></Reveal>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 16 }}>
